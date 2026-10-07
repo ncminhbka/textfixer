@@ -83,7 +83,10 @@ def lines(img: np.ndarray) -> list[dict]:
         caps = bool(lt) and sum(c.isupper() or c.isdigit() for c in lt) >= 0.8 * len(lt)
         h = m["h"] if m else 0.7 * (l["box"][3] - l["box"][1])
         L.append({"id": f"L{i}", "box": [float(v) for v in l["box"]], "poly": l["poly"], "ocr": l["text"],
-                  "size": float(h / (CAP_EM if caps else X_EM)), "color": m["color"] if m else None, "angle": ang})
+                  "size": float(h / (CAP_EM if caps else X_EM)), "color": m["color"] if m else None, "angle": ang,
+                  "caps": caps, "stroke": round(float(m["stroke"]), 1) if m else None,
+                  "stroke_contrast": round(float(m["contrast"]), 2) if m else None,
+                  "effect": {k: v for k, v in (m.get("effect") or {}).items() if k in ("dx", "dy", "color")} if m and m.get("effect") else None})
     return L
 
 
@@ -356,6 +359,20 @@ in px of the poster (as listed per line). The slot is a flex box centered both w
 <i-font key="..." weight="700">...</i-font> only when a line needs another font. Colors: follow the draft; text must stay \
 clearly readable on what is behind it (on the BASE the shell under a line may be gone if you skip it).
 
+LOOK: REPRODUCE THE DRAFT'S STYLE -- the final poster should look like the draft with clean text, not like a different design.
+- Typography per line: match what the model drew and what was measured (weight, all caps, thick-thin strokes, shadow, outline). \
+Pick fonts from the catalog whose class matches (condensed / rounded / serif / script / display), then reproduce the rest with \
+inline CSS: font-weight, font-style:italic, text-transform, letter-spacing for tracked headlines, -webkit-text-stroke or \
+text-shadow for outlines, text-shadow for drop shadows and glows, background-clip:text with a linear-gradient for gradient or \
+metallic (gold / silver) lettering. Keep effects as strong as in the draft -- no weaker, no stronger.
+- Color harmony: put the draft's 3-5 main colors in style.palette (dominant background tone, 1-2 accents, dark and light text \
+tones). Take every text, shell and icon color from that palette or from the measured colors; no new hues. Lines with the same \
+role share the same color and font.
+- Hierarchy: headline > price / offer / call-to-action > body > fine print, by size, weight and color contrast, as the draft \
+shows it. Never make body text compete with the headline.
+- Contrast: every text needs strong contrast with what is really behind it (check the BASE): light text on dark, dark on light; \
+when the background is busy or mid-tone, add a subtle text-shadow or a shell, in the poster's palette.
+
 OUTPUT: one JSON object
 {"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
  "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip|shape|icon", "client": "T0" | null, "html": "...",
@@ -382,6 +399,26 @@ def _px(b) -> str:
     return f"{b[2] - b[0]:.0f}x{b[3] - b[1]:.0f}px"
 
 
+def _look(m: dict) -> str:
+    """Kiểu chữ đo trên nháp: độ đậm (độ dày nét / cỡ chữ), nét dày-mảnh (chữ có chân / viết tay), viết hoa, bóng / viền."""
+    out = []
+    if m.get("stroke") and m.get("size"):
+        r = m["stroke"] / m["size"]   # độ dày nét / em
+        out.append("weight " + ("light" if r < 0.07 else "regular" if r < 0.11 else "bold" if r < 0.16 else "black")
+                   + f" (stroke ~{m['stroke']:.0f}px)")
+    if (m.get("stroke_contrast") or 0) >= 2.2:
+        out.append("thick-thin strokes (serif / script)")
+    if m.get("caps"):
+        out.append("all caps")
+    e = m.get("effect")
+    if e:
+        if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:
+            out.append(f"drop shadow {e.get('color')} offset ({e['dx']:.0f},{e['dy']:.0f})px")
+        else:
+            out.append(f"outline / glow {e.get('color')}")
+    return (", " + ", ".join(out)) if out else ""
+
+
 def describe(M: dict) -> str:
     sh = "\n".join(f"{s['id']}: shell {_px(s['box'])}, fill {s['fill']}, radius ~{s['radius']:.0f}px, contains "
                    f"{', '.join(s['lines'] + s['icons']) or 'nothing'}" for s in M["S"]) or "(none)"
@@ -389,7 +426,7 @@ def describe(M: dict) -> str:
                    + (f", {c['near']}" if c.get("near") else "") for c in M["I"]) or "(none)"
     tilt = lambda m: f", drawn at {m['angle']:.0f} degrees" if abs(m.get("angle") or 0) >= 2 else ""   # noqa: E731
     li = "\n".join(f"{m['id']}: \"{m['ocr']}\" (text ~{m['size']:.0f}px, ~{len(m['ocr'])} characters, color {m['color']}"
-                   + (f", inside {m['shell']}" if m.get("shell") else "") + f"{tilt(m)})" for m in M["L"]) or "(none)"
+                   + (f", inside {m['shell']}" if m.get("shell") else "") + f"{tilt(m)}{_look(m)})" for m in M["L"]) or "(none)"
     return f"Shells:\n{sh}\n\nDetails:\n{de}\n\nText lines:\n{li}"
 
 

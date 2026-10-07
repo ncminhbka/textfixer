@@ -84,7 +84,7 @@ lệnh:
 Người dùng tải ảnh sản phẩm: lời nhắn designer nói rõ chữ / logo trên sản phẩm là `keep`, không vẽ lại. Chữ sản phẩm lấy từ
 **nháp** (không dán ảnh tham chiếu: sản phẩm trong nháp đã được vẽ lại); nháp vẽ sai thì chấp nhận hạn chế model.
 
-Kèm `style` (font tiêu đề, font thân trong bộ OFL), `missing` (câu khách không vẽ / bị bỏ).
+Lời nhắn kèm kiểu chữ đo trên nháp từng dòng (độ đậm theo độ dày nét / cỡ, nét dày-mảnh, viết hoa, bóng / viền: glyph.py). System prompt dặn TÁI TẠO phong cách nháp (font cùng dáng, CSS độ đậm / nghiêng / giãn chữ / viền / bóng / chữ chuyển màu-kim loại), bảng màu 3-5 màu rút từ nháp (mọi màu lấy từ đó), phân cấp tiêu đề > giá / ưu đãi / nút > thân, tương phản với nền thật (bản xoá). Kèm `style` (font tiêu đề, font thân trong bộ OFL), `missing` (câu khách không vẽ / bị bỏ).
 
 ### 5. Dựng và kiểm (`render.py`)
 
