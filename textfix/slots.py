@@ -360,8 +360,9 @@ in px of the poster (as listed per line). The slot is a flex box centered both w
 clearly readable on what is behind it (on the BASE the shell under a line may be gone if you skip it).
 
 LOOK: REPRODUCE THE DRAFT'S STYLE -- the final poster should look like the draft with clean text, not like a different design.
-- Typography per line: match what the model drew and what was measured (weight, all caps, thick-thin strokes, shadow, outline). \
-Pick fonts from the catalog whose class matches (condensed / rounded / serif / script / display), then reproduce the rest with \
+- Typography per line: match what the model drew (look at the images; the measured weight / caps / strokes / shadow / outline \
+are hints, the image wins when they disagree). Pick catalog fonts whose family matches the draft's letterforms (condensed, \
+rounded, geometric, serif, script, display), then reproduce the rest with \
 inline CSS: font-weight, font-style:italic, text-transform, letter-spacing for tracked headlines, -webkit-text-stroke or \
 text-shadow for outlines, text-shadow for drop shadows and glows, background-clip:text with a linear-gradient for gradient or \
 metallic (gold / silver) lettering. Keep effects as strong as in the draft -- no weaker, no stronger.
