@@ -28,7 +28,7 @@ Người duyệt mở công cụ, sửa chỗ sai, bấm Enter. Hướng dẫn d
    %run scripts/make_pairs.py
    ```
    Máy chủ vẽ 36 nháp và 36 bản xoá (ca `r` dùng ảnh tham chiếu trong `bench/refs/`), gói thành các `pairs_NN.zip` (mỗi cái
-   < 27 MB) rồi tự tải về.
+   < 24 MB) rồi tự tải về.
 2. **Máy cá nhân**: giải nén **mọi** `pairs_NN.zip` vào `output/pairs/` của repo (cùng một thư mục, không tạo thư mục con).
 3. Điền sẵn khung của bộ đo hiện tại để chỉ phải sửa, không vẽ từ đầu:
    ```bash

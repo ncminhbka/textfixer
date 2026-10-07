@@ -30,7 +30,7 @@ bash scripts/start_server.sh                # giao diện ở cổng 8088
 python scripts/probe.py                     # thử engine trên bench/prompts_C.json, nhìn output/probe/*.jpg
 ```
 
-Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 27 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
+Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả tự gói thành zip < 24 MB và tự tải về ([docs/SERVER.md](docs/SERVER.md)).
 Đo bộ tách ô bằng bộ đáp án: [docs/SLOTS_GT.md](docs/SLOTS_GT.md).
 
 ## Cấu trúc
@@ -45,7 +45,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/render.py` | Dựng HTML đúng khung ô (thẻ tiện ích icon / sao / font), kiểm lỗi |
 | `textfix/ocr.py`, `glyph.py`, `textmask.py` | OCR dòng, đo nét (cỡ, màu), mặt nạ nét chữ |
 | `textfix/fonts.py`, `icons.py` | Bộ font OFL đủ dấu tiếng Việt, bộ icon Lucide |
-| `textfix/ship.py` | Gói kết quả máy chủ thành zip < 27 MB, tự tải về trình duyệt (JupyterLab) |
+| `textfix/ship.py` | Gói kết quả máy chủ thành zip < 24 MB, tự tải về trình duyệt (JupyterLab) |
 | `server/` | Máy chủ FastAPI + giao diện form |
 | `scripts/make_pairs.py`, `slots_gt.py` | Cặp nháp / bản xoá (máy chủ); bộ đáp án ô: điền sẵn, chấm (máy cá nhân) |
 | `tools/annotate.html` | Công cụ gán nhãn ô S / I / L / P (Chrome / Edge, ghi thẳng vào repo) |

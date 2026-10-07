@@ -7,9 +7,10 @@
   %run scripts/make_pairs.py --set bench/prompts_C.json --seeds 0,1,2
   # terminal (không tự tải, tải tay các zip trong output/pairs_zip/):
   python scripts/make_pairs.py
+  %run scripts/make_pairs.py --ship-only             # không vẽ, chỉ gói lại zip các cặp đã có (vd. đổi cỡ zip: --zip-mb 15)
 
 Ra output/pairs/<key>_draft.png, <key>_plate.png (đặt tên như probe.py --data), pairs.json (prompt, câu khách, cỡ, seed, căn bản
-xoá, thời gian), rồi gói output/pairs_zip/pairs_NN.zip (mỗi zip < 27 MB) và tự tải về.
+xoá, thời gian), rồi gói output/pairs_zip/pairs_NN.zip (mỗi zip < 24 MB) và tự tải về.
 key = <mã prompt>_s<seed>, mã prompt = phần trước dấu "_" đầu tiên của key trong bộ prompt (p11_distill_s4 -> p11). Seed: --seeds
 nếu có, không thì "seeds" của từng prompt, không có nữa thì 0,1,2.
 Prompt có "ref" (ảnh sản phẩm trong bench/refs/): ảnh đó làm ảnh tham chiếu cho FLUX, như khi người dùng tải ảnh sản phẩm lên
@@ -44,6 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "output" / "pairs")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--no-ship", action="store_true", help="không gói / tải zip")
+    ap.add_argument("--ship-only", action="store_true", help="không nạp FLUX / vẽ, chỉ gói lại zip các cặp đã có")
+    ap.add_argument("--zip-mb", type=float, default=None, help="cỡ tối đa mỗi zip (MiB), mặc định 22 (< 24 MB)")
     a = ap.parse_args(argv)
     config.load_env()
     force_seeds = [int(s) for s in a.seeds.split(",") if s.strip()]
@@ -53,7 +56,9 @@ def main(argv: list[str] | None = None) -> int:
     meta_f = a.out / "pairs.json"
     meta = json.loads(meta_f.read_text(encoding="utf-8")) if meta_f.exists() else {}
     t0 = time.time()
-    F = Flux(a.model).load()
+    if a.ship_only:
+        jobs = []
+    F = Flux(a.model).load() if jobs else None
     seeds_of = lambda j: force_seeds or j.get("seeds") or [0, 1, 2]   # noqa: E731
     def ref_of(j):
         if not j.get("ref"):
@@ -62,7 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         im.thumbnail((1024, 1024))   # như server/app.py decode_image
         return np.asarray(im)
 
-    print(f"nạp FLUX {a.model} {time.time() - t0:.0f}s, {len(jobs)} prompt, {sum(len(seeds_of(j)) for j in jobs)} cặp")
+    if F is not None:
+        print(f"nạp FLUX {a.model} {time.time() - t0:.0f}s, {len(jobs)} prompt, {sum(len(seeds_of(j)) for j in jobs)} cặp")
     for j in jobs:
         for seed in seeds_of(j):
             key = f"{j['key'].split('_')[0]}_s{seed}"
@@ -92,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
     if not a.no_ship:
         files = [(meta_f, "pairs.json")] + [(p, p.name) for p in sorted(a.out.glob("*_draft.png")) + sorted(a.out.glob("*_plate.png"))
                                             if p.name.rsplit("_", 1)[0] in meta]
-        ship.offer(ship.pack(files, a.out.parent / "pairs_zip", "pairs"))
+        ship.offer(ship.pack(files, a.out.parent / "pairs_zip", "pairs", int(a.zip_mb * 2**20) if a.zip_mb else None))
     return 0
 
 

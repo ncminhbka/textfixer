@@ -2,7 +2,7 @@
 """THỬ ENGINE trên bộ prompt cố định (bench/prompts_C.json: prompt FLUX + câu khách + cỡ), nhìn bằng mắt.
 
   %run scripts/probe.py                                 # máy chủ, trong ô notebook: FLUX distill vẽ nháp + xoá, VLM thật;
-                                                        # cuối cùng gói output/probe thành zip < 27 MB và tự tải về
+                                                        # cuối cùng gói output/probe thành zip < 24 MB và tự tải về
   python scripts/probe.py                               # terminal: như trên, zip ở output/probe_zip/ (tải tay)
   python scripts/probe.py --only p11_distill_s4,q21_distill_s0
   python scripts/probe.py --data <thư mục>              # dùng nháp / bản xoá có sẵn: <key>_draft.png (+ <key>_plate.png)

@@ -79,7 +79,7 @@ thời gian).
 
 ## 6. Thử engine không qua giao diện
 
-Mọi script chạy trên máy chủ tự gói kết quả thành các zip **độc lập, mỗi zip < 27 MB** (giải nén từng cái, không cần ghép) và
+Mọi script chạy trên máy chủ tự gói kết quả thành các zip **độc lập, mỗi zip < 24 MB** (giải nén từng cái, không cần ghép) và
 **tự tải về** khi chạy bằng ô notebook (`%run`). Chạy từ terminal thì zip vẫn được gói, tải tay từ cây thư mục JupyterLab.
 Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": chọn cho phép.
 

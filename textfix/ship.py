@@ -1,4 +1,4 @@
-"""MANG KẾT QUẢ VỀ từ máy chủ JupyterLab: gói các tệp thành nhiều zip ĐỘC LẬP, mỗi zip < 27 MB (giải nén từng cái, không phải
+"""MANG KẾT QUẢ VỀ từ máy chủ JupyterLab: gói các tệp thành nhiều zip ĐỘC LẬP, mỗi zip < 24 MB (giải nén từng cái, không phải
 ghép), rồi tự tải về trình duyệt.
 
   zips = pack(files, out_dir, "pairs")   # files: [(đường dẫn trên đĩa, tên trong zip)] -> [out_dir/pairs_01.zip, ...]
@@ -12,16 +12,20 @@ Trình duyệt có thể hỏi "cho phép tải nhiều tệp" lần đầu: ch�
 from __future__ import annotations
 
 import json
+import os
 import zipfile
 from pathlib import Path
 
-LIMIT = 27 * 1024 * 1024
+# giới hạn tải lên phía người nhận: 24 MB. Lấy 22 MiB (= 23.07 triệu byte) để dưới 24 MB dù tính MB = 10^6 hay 2^20 byte.
+# Đổi: biến môi trường TEXTFIX_ZIP_MB (MiB) hoặc tham số limit.
+LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)
 HEADROOM = 256 * 1024   # chừa cho mục lục zip / tên tệp
 
 
-def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int = LIMIT) -> list[Path]:
+def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int | None = None) -> list[Path]:
     """Xếp tệp vào các zip độc lập < limit (xếp tham lam theo cỡ giảm dần vào zip đầu tiên còn chỗ). Ảnh đã nén (png / jpg) lưu
     thẳng, còn lại deflate. Tệp đơn lẻ to hơn limit -> lỗi (cắt nhỏ tệp trước khi gói)."""
+    limit = limit or LIMIT
     cap = limit - HEADROOM
     items = sorted(((Path(p), arc, Path(p).stat().st_size) for p, arc in files), key=lambda t: -t[2])
     big = [str(p) for p, _, s in items if s > cap]
@@ -51,7 +55,7 @@ def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int = L
     return zips
 
 
-def pack_dir(src: Path, out_dir: Path, name: str, pattern: str = "*", limit: int = LIMIT) -> list[Path]:
+def pack_dir(src: Path, out_dir: Path, name: str, pattern: str = "*", limit: int | None = None) -> list[Path]:
     """Gói mọi tệp khớp pattern trong src (đệ quy), tên trong zip = đường dẫn tương đối từ src."""
     files = [(p, str(p.relative_to(src)).replace("\\", "/")) for p in sorted(Path(src).rglob(pattern)) if p.is_file()]
     return pack(files, out_dir, name, limit)
@@ -97,7 +101,7 @@ def offer(zips: list[Path]) -> None:
     import uuid
     zips = [Path(z).resolve() for z in zips]
     total = sum(z.stat().st_size for z in zips) / 2**20
-    print(f"đã gói {len(zips)} zip ({total:.1f} MB), mỗi zip < {LIMIT / 2**20:.0f} MB:")
+    print(f"đã gói {len(zips)} zip ({total:.1f} MB), mỗi zip <= {max(z.stat().st_size for z in zips) / 1e6:.1f} triệu byte:")
     for z in zips:
         print(f"  {z}  ({z.stat().st_size / 2**20:.1f} MB)")
     if not _in_notebook():
