@@ -105,6 +105,10 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 
 Biến môi trường trong notebook: `%env` từng biến, hoặc chạy `source ~/textfix_env.sh` trước khi mở JupyterLab.
 
+**Dùng cả 2 card:** `make_pairs.py`, `erase_probe.py` mặc định chạy mỗi A30 một tiến trình (mỗi tiến trình một bản FLUX ≈ 17 GB,
+chia đều việc, nhật ký có tiền tố `[gpu k]`), nhanh gần gấp đôi. Tiến trình con bỏ qua `TEXTFIX_DEVICE_*` và đặt mọi phần
+FLUX lên card của nó. `--gpus 1` để chạy một tiến trình như cũ (vd. khi card kia đang bận).
+
 `probe.py` ra `output/probe/<key>.jpg` (nháp | ô | bản xoá | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
 
 ## Sự cố

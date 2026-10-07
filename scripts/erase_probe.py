@@ -4,6 +4,7 @@
   %run scripts/erase_probe.py                        # mọi lời dặn x mọi nháp -> zip < 24 MB, tự tải về
   %run scripts/erase_probe.py --variants B,F --only h06_s0,r02_s0
   %run scripts/erase_probe.py --ship-only            # chỉ gói lại kết quả đã có
+Mặc định dùng MỌI GPU (mỗi card một bản FLUX, chia đều; textfix/multigpu.py); --gpus 1: một tiến trình.
 
 Ra output/erase_probe/<lời dặn>/<key>_plate.png (đã căn theo nháp như erase()), variants.json (lời dặn, thời gian, căn).
 Lời dặn A (hiện tại) = bản xoá trong output/pairs, không chạy lại. A2 = xoá lần hai trên bản xoá A (lời dặn A).
@@ -42,7 +43,7 @@ VARIANTS = {
 def main(argv: list[str] | None = None) -> int:
     import numpy as np
     from PIL import Image
-    from textfix import config, ship
+    from textfix import config, multigpu, ship
     from textfix.flux import ERASE_PROMPT, Flux, register
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", type=Path, default=ROOT / "output" / "pairs")
@@ -52,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--ship-only", action="store_true")
     ap.add_argument("--zip-mb", type=float, default=None)
+    multigpu.add_args(ap)
     a = ap.parse_args(argv)
     config.load_env()
     meta = json.loads((a.pairs / "pairs.json").read_text(encoding="utf-8"))
@@ -59,42 +61,46 @@ def main(argv: list[str] | None = None) -> int:
     vs = [v for v in a.variants.split(",") if v in VARIANTS]
     a.out.mkdir(parents=True, exist_ok=True)
     info_f = a.out / "variants.json"
-    info = json.loads(info_f.read_text(encoding="utf-8")) if info_f.exists() else {}
-    info["A"] = {"prompt": ERASE_PROMPT, "note": "bản xoá trong output/pairs"}
-    F = None
-    if not a.ship_only:
+    todo = [] if a.ship_only else [(v, k) for v in vs for k in keys if a.force or not (a.out / v / f"{k}_plate.png").exists()]
+    if todo and multigpu.fanout(a, __file__, argv):   # mỗi card một tiến trình con, chia đều các bản xoá
+        todo = []
+    todo = multigpu.shard(todo, a)
+    info = {} if a.shard else multigpu.merge(info_f, deep=("runs",))
+    info_out = multigpu.part(info_f, a)
+    if not a.shard:
+        info["A"] = {"prompt": ERASE_PROMPT, "note": "bản xoá trong output/pairs"}
+    if todo:
         t0 = time.time()
         F = Flux("distill").load()
-        print(f"nạp FLUX {time.time() - t0:.0f}s; {len(vs)} lời dặn x {len(keys)} nháp")
-    for v in vs if F else []:
+        print(f"nạp FLUX {time.time() - t0:.0f}s; {len(todo)} bản xoá cần chạy")
+    for v, k in todo:
         prompt = VARIANTS[v] or ERASE_PROMPT
         info.setdefault(v, {"prompt": prompt, "note": "xoá lần hai trên bản xoá A" if v == "A2" else "", "runs": {}})
         (a.out / v).mkdir(exist_ok=True)
-        for k in keys:
-            fo = a.out / v / f"{k}_plate.png"
-            if fo.exists() and not a.force:
-                continue
-            seed = int(meta[k].get("seed", 0))
-            draft = np.asarray(Image.open(a.pairs / f"{k}_draft.png").convert("RGB"))
-            src = np.asarray(Image.open(a.pairs / f"{k}_plate.png").convert("RGB")) if v == "A2" else draft
-            try:
-                t1 = time.time()
-                plate, reg = register(draft, F.edit(src, prompt, seed))
-                dt = time.time() - t1
-            except Exception as e:
-                print(f"{v} {k}: LỖI {type(e).__name__}: {str(e)[:300]}")
-                continue
-            Image.fromarray(plate).save(fo)
-            info[v]["runs"][k] = {"s": round(dt, 1), "register": reg}
-            info_f.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
-            print(f"{v} {k}: {dt:.1f}s")
-    info_f.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+        seed = int(meta[k].get("seed", 0))
+        draft = np.asarray(Image.open(a.pairs / f"{k}_draft.png").convert("RGB"))
+        src = np.asarray(Image.open(a.pairs / f"{k}_plate.png").convert("RGB")) if v == "A2" else draft
+        try:
+            t1 = time.time()
+            plate, reg = register(draft, F.edit(src, prompt, seed))
+            dt = time.time() - t1
+        except Exception as e:
+            print(f"{v} {k}: LỖI {type(e).__name__}: {str(e)[:300]}")
+            continue
+        Image.fromarray(plate).save(a.out / v / f"{k}_plate.png")
+        info[v]["runs"][k] = {"s": round(dt, 1), "register": reg}
+        info_out.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"{v} {k}: {dt:.1f}s")
+    if a.shard:
+        return 0
+    info_out.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+    info = multigpu.merge(info_f, deep=("runs",))
     files = [(info_f, "variants.json")] + [(p, f"{p.parent.name}/{p.name}") for v in vs if (a.out / v).is_dir()
                                            for p in sorted((a.out / v).glob("*_plate.png"))]
     print(f"xong: {len(files) - 1} bản xoá ở {a.out}")
-    ship.offer(ship.pack(files, a.out.parent / "erase_probe_zip", "erase", int(a.zip_mb * 2**20) if a.zip_mb else None))
+    if not a.no_ship:
+        ship.offer(ship.pack(files, a.out.parent / "erase_probe_zip", "erase", int(a.zip_mb * 2**20) if a.zip_mb else None))
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
