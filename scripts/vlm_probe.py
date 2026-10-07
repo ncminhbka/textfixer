@@ -75,7 +75,11 @@ def main(argv: list[str] | None = None) -> int:
             D[k] = {"draft": d, "plate": cl, "M": slots.build(d, cl), "prompt": meta[k]["prompt"],
                     "texts": [t for t in meta[k]["texts"] if not t.get("scene")], "product": bool(meta[k].get("ref"))}
             print(f"ô {k}: L {len(D[k]['M']['L'])} S {len(D[k]['M']['S'])} I {len(D[k]['M']['I'])}")
-        jobs = [(v, k) for v in views for k in keys if a.fresh or not (a.out / v / f"{k}.json").exists()]
+        def done(v, k):   # đã có kết quả không lỗi (lượt lỗi VLM chạy lại)
+            f = a.out / v / f"{k}.json"
+            return f.exists() and not json.loads(f.read_text(encoding="utf-8")).get("error")
+
+        jobs = [(v, k) for v in views for k in keys if a.fresh or not done(v, k)]
         print(f"{len(jobs)} lượt ({len(views)} cấu hình x {len(keys)} ảnh), {a.workers} lời gọi song song")
 
         def plan(job):

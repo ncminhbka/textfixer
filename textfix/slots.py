@@ -400,9 +400,30 @@ def _system(base: str) -> str:
     return base.replace("{fonts}", fonts).replace("{icons}", ", ".join(sorted(available())))
 
 
-def _to_marks(P: dict) -> dict:
-    """slots -> marks (render dùng marks)."""
-    return {**P, "ops": [{**op, "marks": list(op.get("slots") or op.get("marks") or [])} for op in P.get("ops", [])]}
+def _obj(x) -> dict:
+    """Đầu ra VLM về dict: đôi khi trả JSON lồng trong chuỗi, hoặc mảng."""
+    if isinstance(x, str):
+        try:
+            x = json.loads(x)
+        except ValueError:
+            return {}
+    if isinstance(x, list):
+        x = {"ops": x}
+    return x if isinstance(x, dict) else {}
+
+
+def _to_marks(P) -> dict:
+    """slots -> marks (render dùng marks). Lệnh không phải object (VLM trả sai khuôn) bị bỏ, ghi vào "dropped"."""
+    P = _obj(P)
+    ops, bad = [], []
+    for raw in P.get("ops") or []:
+        op = _obj(raw) if isinstance(raw, str) else raw
+        if not isinstance(op, dict) or not op:
+            bad.append(str(raw)[:80])
+            continue
+        sl = op.get("slots") or op.get("marks") or []
+        ops.append({**op, "marks": [m for m in (sl if isinstance(sl, list) else [sl]) if isinstance(m, str)]})
+    return {**P, "ops": ops, **({"dropped": bad} if bad else {})}
 
 
 def _texts(texts: list[dict]) -> str:
@@ -498,7 +519,7 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
 
 def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
     """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh."""
-    log, ops = [], []
+    log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
     by = M["by"]
     for op in P.get("ops", []):
         mk = [m for m in op.get("marks") or [] if m in by]
@@ -547,7 +568,8 @@ def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nInvolved ops:\n{json.dumps(ops, ensure_ascii=False)}")
     out = call(*((_system(SYSTEM) + "\n\n" + REPAIR, [user, *parts]) + ((meta,) if meta is not None else ())))
-    new, patches = [], {p.get("id"): p for p in out.get("patches", []) if p.get("id")}
+    out = _obj(out)
+    new, patches = [], {p.get("id"): p for p in out.get("patches") or [] if isinstance(p, dict) and p.get("id")}
     for op in P["ops"]:
         p = patches.pop(op["id"], None)
         if p is None:
