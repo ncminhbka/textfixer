@@ -373,6 +373,14 @@ role share the same color and font.
 shows it. Never make body text compete with the headline.
 - Contrast: every text needs strong contrast with what is really behind it (check the BASE): light text on dark, dark on light; \
 when the background is busy or mid-tone, add a subtle text-shadow or a shell, in the poster's palette.
+- Lost shells: if the DRAFT shows a button, pill, badge or band behind a line but the BASE does not (the eraser removed it and \
+no S# slot covers it), recreate it in that text op's box_style (background, border-radius, a little padding) in the draft's \
+colors -- a call-to-action must never end up as bare text.
+- Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe". \
+If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
+- Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
+never merge list rows into one block and never leave a bullet or icon without its text.
+- Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 
 OUTPUT: one JSON object
 {"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
@@ -479,7 +487,7 @@ VIEWS = {   # ảnh gửi designer (thử: scripts/vlm_probe.py). D nháp, S nh�
     "BX": "DSX",
     "CX": "SXZ",
 }
-VIEW = "A"   # cấu hình dùng thật (chốt theo kết quả thử)
+VIEW = "BX"  # chốt 07/10 (vlm_probe 23 ảnh dev): ít lỗi nhất, giữ chữ sản phẩm tốt nhất (29/30), rẻ nhất (~12k token)
 
 
 def _quarters(mk) -> list[bytes]:

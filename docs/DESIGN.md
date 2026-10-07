@@ -71,7 +71,7 @@ Chữ số to OCR bỏ sót (số bước trong vòng tròn) thành chi tiết: 
 
 ### 4. Designer (`slots.py`)
 
-Một lời gọi VLM: prompt FLUX, câu khách, danh sách ô kèm số đo, 6 ảnh (nháp, nháp đánh dấu ô, 4 góc phóng 2×). VLM trả mỗi ô một
+Một lời gọi VLM: prompt FLUX, câu khách, danh sách ô kèm số đo, 3 ảnh: nháp, nháp đánh dấu ô, **bản xoá đã dọn** (nền thật sẽ dựng lên: vỏ nào còn, nền sau mỗi dòng). Chốt 07/10 bằng scripts/vlm_probe.py trên 23 ảnh dev, so 4 cấu hình (6 ảnh cũ / +bản xoá / 3 ảnh / vùng cắt quanh cụm ô): 3 ảnh ít lỗi nhất (56 so với 61-71), giữ chữ sản phẩm tốt nhất (29/30 ô P được keep), rẻ nhất (~12k token so với ~16k), giữ dáng chữ nháp tốt hơn; ảnh phóng 2× không giúp. VLM trả mỗi ô một
 lệnh:
 
 | Ô | Lệnh |
@@ -91,6 +91,8 @@ Lời nhắn kèm kiểu chữ đo trên nháp từng dòng (độ đậm theo �
 Nền = bản xoá (+ pixel nháp ở dòng `keep`). Mỗi lệnh một div đúng khung các ô của nó (dòng nghiêng: dựng thẳng rồi xoay), lớp vỏ ->
 chi tiết -> chữ. VLM ghi cỡ px, code đổi sang em để vòng co cho vừa co đều. Thẻ tiện ích -> SVG Lucide / SVG sao / `@font-face`
 nhúng sẵn. HTML được làm sạch (bỏ script, `on*`, URL, img).
+
+Đo tràn: khung ô ôm nét mực, hộp chữ trình duyệt = ascent + descent của font -> trừ phần đệm trên / dưới (measureText trên chính chữ của khối), không thì mọi dòng bị co ~0.6-0.8 (lỗi 07/10: 80% lỗi too_small, chữ nhỏ hơn nháp). Nạp hết font trước khi đo.
 
 Kiểm (khách quan, không cần mắt): ô chưa thuộc lệnh nào, ô dùng hai lần, khung / nội dung hai lệnh chồng nhau, tràn khung, phải co
 dưới 70% (nhồi quá nhiều chữ). Có lỗi: **một** vòng VLM chỉ vá các lệnh / ô lỗi (kèm ảnh phóng vùng lỗi), giữ bản ít lỗi hơn.

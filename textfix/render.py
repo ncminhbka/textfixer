@@ -167,10 +167,23 @@ async (o) => {
     const R0 = c.getBoundingClientRect();
     // TRÀN = nội dung thật (mọi con, kể cả SVG) vượt khung ở BẤT KỲ phía nào (nội dung căn giữa tràn cả trái -- scrollWidth chỉ
     // đếm phía phải: p20 hàng sao thò ra ngoài huy hiệu bên trái)
+    // KHUNG Ô ôm NÉT MỰC (cả dấu thanh), còn hộp chữ của trình duyệt = ascent + descent của font (đệm trên / dưới nét): so
+    // thẳng thì mọi dòng "tràn dọc" và bị co ~0.6-0.8 (07/10: 80% lỗi too_small, chữ nhỏ / nhạt hơn nháp). Trừ phần đệm đó --
+    // đo bằng measureText trên chính chữ của khối, theo font của khối (tỉ lệ theo cỡ, đo một lần ở 100px).
+    const pad = (() => {
+      const t = d.textContent.trim();
+      if (!t) return {top: 0, bot: 0};
+      const cs = getComputedStyle(d), cx = document.createElement('canvas').getContext('2d');
+      cx.font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`;
+      const mt = cx.measureText(t);
+      return {top: Math.max(0, mt.fontBoundingBoxAscent - mt.actualBoundingBoxAscent) / 100,
+              bot: Math.max(0, mt.fontBoundingBoxDescent - mt.actualBoundingBoxDescent) / 100};
+    })();
     const over = () => {
       const rr = document.createRange(); rr.selectNodeContents(d);
       const q = rr.getBoundingClientRect(), b = d.getBoundingClientRect();
-      return {q, v: Math.max(0, b.left - q.left, q.right - b.right, b.top - q.top, q.bottom - b.bottom)};
+      const fs = parseFloat(d.style.fontSize) || 0;
+      return {q, v: Math.max(0, b.left - q.left, q.right - b.right, b.top - q.top - pad.top * fs, q.bottom - b.bottom - pad.bot * fs)};
     };
     // ô KHÔNG có nội dung (vỏ chỉ có CSS): không đo tràn -- khung nội dung rỗng nằm ở (0,0) cho số tràn ảo (07/10 p11: 429 / 916 px)
     if (!d.textContent.trim() && !d.querySelector('svg')) {
