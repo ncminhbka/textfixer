@@ -6,6 +6,7 @@
   python scripts/probe.py                               # terminal: như trên, zip ở output/probe_zip/ (tải tay)
   python scripts/probe.py --only p11_distill_s4,q21_distill_s0
   python scripts/probe.py --data <thư mục>              # dùng nháp / bản xoá có sẵn: <key>_draft.png (+ <key>_plate.png)
+  %run scripts/probe.py --pairs output/pairs --only r01_s0,r02_s0   # cặp của make_pairs.py (bộ đáp án), VLM thật
   python scripts/probe.py --data <thư mục> --dry        # không VLM (lệnh giả: vỏ tô màu đo, chi tiết = chấm, chữ = chữ OCR):
                                                         # kiểm phần đo / dựng ở máy không GPU, không mạng
 
@@ -57,11 +58,18 @@ def main() -> int:
     ap.add_argument("--data", type=Path, default=None, help="thư mục nháp có sẵn (<key>_draft.png, tuỳ chọn <key>_plate.png)")
     ap.add_argument("--plate-suffix", default="plate", help="bản xoá có sẵn: <key>_<hậu tố>.png")
     ap.add_argument("--dry", action="store_true", help="VLM giả (kiểm đo / dựng)")
+    ap.add_argument("--pairs", type=Path, default=None, help="dùng cặp nháp / bản xoá của make_pairs.py (<thư mục>/pairs.json; "
+                                                                "key có seed, vd r02_s0): như --data, lấy prompt / câu khách / ảnh tham chiếu từ pairs.json")
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "output" / "probe")
     ap.add_argument("--no-ship", action="store_true", help="không gói / tải zip")
     a = ap.parse_args()
     config.load_env()
-    jobs = [j for j in json.loads(a.set.read_text(encoding="utf-8")) if not a.only or j["key"] in a.only.split(",")]
+    if a.pairs is not None:
+        a.data = a.pairs
+        jobs = [{"key": k, **v} for k, v in json.loads((a.pairs / "pairs.json").read_text(encoding="utf-8")).items()]
+    else:
+        jobs = json.loads(a.set.read_text(encoding="utf-8"))
+    jobs = [j for j in jobs if not a.only or j["key"] in a.only.split(",")]
     a.out.mkdir(parents=True, exist_ok=True)
     F = None
     if a.data is None or any(not (a.data / f"{j['key']}_{a.plate_suffix}.png").exists() for j in jobs):
@@ -73,7 +81,7 @@ def main() -> int:
     with Engine(F, progress=lambda m: print("   ..", m, flush=True), llm=fake, vlm=fake) as E:
         for j in jobs:
             k = j["key"]
-            seed = int(k.rsplit("_s", 1)[1]) if "_s" in k else (j.get("seeds") or [0])[0]
+            seed = int(j["seed"]) if "seed" in j else int(k.rsplit("_s", 1)[1]) if "_s" in k else (j.get("seeds") or [0])[0]
             B = {"prompt_en": j["prompt"], "texts": [t for t in j["texts"] if not t.get("scene")]}
             product = None
             if j.get("ref"):   # ảnh sản phẩm người dùng tải lên (bench/refs), thu nhỏ như máy chủ
