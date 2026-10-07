@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gán nhãn ô</title>
+<style>
+  :root {
+    --bg: #15171a; --panel: #1d2024; --line: #30343a; --text: #e6e8eb; --muted: #9aa1aa; --accent: #4c9aff;
+    --L: #ff4d4d; --S: #3d8bff; --I: #ffa320; --P: #b46bff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; }
+  body { display: grid; grid-template-columns: 230px 1fr; grid-template-rows: 44px 1fr; height: 100vh; overflow: hidden; }
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--panel);
+           border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+  header .key { font-weight: 600; min-width: 90px; }
+  button { background: #2a2e34; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .cls { display: inline-flex; gap: 4px; }
+  .cls button { padding: 4px 8px; }
+  .cls button.on { color: #fff; }
+  .cls button[data-c=L].on { background: var(--L); border-color: var(--L); }
+  .cls button[data-c=S].on { background: var(--S); border-color: var(--S); }
+  .cls button[data-c=I].on { background: var(--I); border-color: var(--I); }
+  .cls button[data-c=P].on { background: var(--P); border-color: var(--P); }
+  .muted { color: var(--muted); }
+  .dirty { color: var(--I); }
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  #list { overflow-y: auto; flex: 1; min-height: 0; }
+  #info { border-top: 1px solid var(--line); padding: 8px 10px; max-height: 45%; overflow-y: auto; font-size: 12px; }
+  #info .lv { font-weight: 600; }
+  #info ul { margin: 4px 0 0; padding-left: 16px; }
+  #info li.scene { color: var(--P); }
+  aside .item { display: flex; justify-content: space-between; padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #23262b; }
+  aside .item:hover { background: #24282d; }
+  aside .item.cur { background: #2b3542; }
+  .badge { font-size: 11px; padding: 1px 6px; border-radius: 9px; background: #333; color: var(--muted); }
+  .badge.done { background: #1f5c35; color: #c9f5d6; }
+  .badge.editing { background: #5c4a1f; color: #f5e3c9; }
+  main { position: relative; overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  #start { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #start .card { max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; }
+  #start h1 { font-size: 18px; margin: 0 0 10px; }
+  #help { position: absolute; right: 10px; bottom: 10px; background: rgba(29,32,36,.94); border: 1px solid var(--line);
+          border-radius: 8px; padding: 10px 14px; font-size: 12px; max-width: 360px; }
+  #help kbd { background: #2a2e34; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font: 11px ui-monospace, monospace; }
+  #help table { border-collapse: collapse; }
+  #help td { padding: 1px 6px 1px 0; vertical-align: top; }
+  #toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: #2b3542; padding: 6px 14px;
+           border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <button id="open" class="primary">Mở thư mục repo</button>
+  <span class="key" id="key">—</span>
+  <span class="cls" id="cls">
+    <button data-c="L" title="1">1 L dòng chữ</button><button data-c="S" title="2">2 S vỏ</button>
+    <button data-c="I" title="3">3 I chi tiết</button><button data-c="P" title="4">4 P chữ cảnh</button>
+  </span>
+  <span id="counts" class="muted"></span>
+  <span id="status" class="muted"></span>
+  <span style="flex:1"></span>
+  <button id="keys" title="?">? phím tắt</button>
+  <button id="done">Xong ảnh này (Enter)</button>
+  <button id="save">Lưu (Ctrl+S)</button>
+</header>
+<aside><div id="list"></div><div id="info" class="muted">—</div></aside>
+<main id="main">
+  <canvas id="cv"></canvas>
+  <div id="start"><div class="card">
+    <h1>Gán nhãn ô S / I / L / P</h1>
+    <p>Bấm <b>Mở thư mục repo</b> và chọn thư mục gốc <code>textfix</code> (cho phép sửa). Công cụ đọc ảnh ở
+      <code>output/pairs/</code> và đáp án ở <code>bench/slots_gt/</code>, ghi thẳng lại vào đó.</p>
+    <p class="muted">Cần Chrome hoặc Edge. Chạy <code>python scripts/slots_gt.py prefill</code> trước để có sẵn khung của bộ đo
+      hiện tại. Luật gán nhãn: <code>docs/SLOTS_GT.md</code>.</p>
+  </div></div>
+  <div id="help">
+    <table>
+      <tr><td><b>Vẽ</b></td><td>kéo chuột ở chỗ trống (hoặc trong khung chưa chọn)</td></tr>
+      <tr><td><b>Chọn / sửa</b></td><td>bấm vào khung; kéo để dời, kéo ô vuông ở mép để đổi cỡ</td></tr>
+      <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>lớp L / S / I / P (đổi cả khung đang chọn)</td></tr>
+      <tr><td><kbd>Del</kbd> <kbd>Esc</kbd></td><td>xoá khung · bỏ chọn</td></tr>
+      <tr><td><kbd>←↑→↓</kbd></td><td>nhích 1 px (Shift: 10 px); Alt+mũi tên: nới mép</td></tr>
+      <tr><td><kbd>Space</kbd> giữ</td><td>xem bản xoá · <kbd>D</kbd> tô lớp phủ (nháp − bản xoá)</td></tr>
+      <tr><td><kbd>H</kbd> <kbd>F</kbd></td><td>ẩn / hiện khung · vừa màn hình</td></tr>
+      <tr><td>lăn chuột</td><td>phóng; kéo chuột phải / giữa: dời ảnh</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd> <kbd>Ctrl+Y</kbd></td><td>hoàn tác · làm lại</td></tr>
+      <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>ảnh trước / sau (tự lưu) · <kbd>Enter</kbd> xong + sang ảnh sau</td></tr>
+      <tr><td><kbd>?</kbd></td><td>ẩn / hiện bảng này</td></tr>
+    </table>
+  </div>
+  <div id="toast"></div>
+</main>
+<script>
+"use strict";
+const COLORS = { L: "#ff4d4d", S: "#3d8bff", I: "#ffa320", P: "#b46bff" };
+const $ = (id) => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+const st = {
+  pairsDir: null, gtDir: null, keys: [], meta: {}, pairs: {}, idx: -1, cls: "L",
+  draft: null, plate: null, diff: null, size: [0, 0], boxes: [], status: "editing", dirty: false,
+  sel: -1, undo: [], redo: [], view: { s: 1, x: 0, y: 0 }, showPlate: false, showDiff: false, hide: false, drag: null,
+};
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.opacity = 1; clearTimeout(t._h); t._h = setTimeout(() => t.style.opacity = 0, 1600); }
+
+// ------------------------------------------------------------------------------------------- tệp
+$("open").onclick = async () => {
+  if (!window.showDirectoryPicker) { alert("Trình duyệt không hỗ trợ mở thư mục: dùng Chrome hoặc Edge."); return; }
+  let root;
+  try { root = await window.showDirectoryPicker({ mode: "readwrite" }); } catch (e) { return; }
+  try {
+    st.pairsDir = await (await root.getDirectoryHandle("output")).getDirectoryHandle("pairs");
+  } catch (e) { alert("Không thấy output/pairs/ trong thư mục đã chọn. Chọn thư mục gốc repo textfix."); return; }
+  st.gtDir = await (await root.getDirectoryHandle("bench", { create: true })).getDirectoryHandle("slots_gt", { create: true });
+  const names = new Set();
+  for await (const [name] of st.pairsDir.entries()) names.add(name);
+  st.keys = [...names].filter(n => n.endsWith("_draft.png") && names.has(n.replace("_draft.png", "_plate.png")))
+    .map(n => n.slice(0, -"_draft.png".length)).sort();
+  if (!st.keys.length) { alert("output/pairs/ chưa có cặp <key>_draft.png + <key>_plate.png."); return; }
+  for (const k of st.keys) st.meta[k] = await readGT(k);
+  try { st.pairs = JSON.parse(await (await (await st.pairsDir.getFileHandle("pairs.json")).getFile()).text()); } catch (e) { st.pairs = {}; }
+  $("start").style.display = "none";
+  $("help").style.display = "none";   // bảng phím che ảnh: ẩn khi bắt đầu làm, ? hoặc nút "phím tắt" để xem lại
+  renderList();
+  const first = st.keys.findIndex(k => (st.meta[k] || {}).status !== "done");
+  await openIdx(first < 0 ? 0 : first);
+};
+
+async function readGT(k) {
+  try { return JSON.parse(await (await (await st.gtDir.getFileHandle(k + ".json")).getFile()).text()); } catch (e) { return null; }
+}
+
+async function loadImg(name) {
+  const f = await (await st.pairsDir.getFileHandle(name)).getFile();
+  const img = new Image();
+  img.src = URL.createObjectURL(f);
+  await img.decode();
+  return img;
+}
+
+function makeDiff(a, b) {
+  const W = a.naturalWidth, H = a.naturalHeight, c1 = new OffscreenCanvas(W, H), c2 = new OffscreenCanvas(W, H);
+  const x1 = c1.getContext("2d"), x2 = c2.getContext("2d");
+  x1.drawImage(a, 0, 0); x2.drawImage(b, 0, 0, W, H);
+  const d1 = x1.getImageData(0, 0, W, H), d2 = x2.getImageData(0, 0, W, H), o = new ImageData(W, H);
+  for (let i = 0; i < d1.data.length; i += 4) {
+    const v = Math.max(Math.abs(d1.data[i] - d2.data[i]), Math.abs(d1.data[i + 1] - d2.data[i + 1]), Math.abs(d1.data[i + 2] - d2.data[i + 2]));
+    if (v > 40) { o.data[i] = 255; o.data[i + 1] = 0; o.data[i + 2] = 200; o.data[i + 3] = 110; }
+  }
+  const c = new OffscreenCanvas(W, H); c.getContext("2d").putImageData(o, 0, 0);
+  return c;
+}
+
+async function openIdx(i) {
+  if (i < 0 || i >= st.keys.length) return;
+  if (st.dirty) await save();
+  st.idx = i;
+  const k = st.keys[i];
+  st.draft = await loadImg(k + "_draft.png");
+  st.plate = await loadImg(k + "_plate.png");
+  st.diff = makeDiff(st.draft, st.plate);
+  st.size = [st.draft.naturalWidth, st.draft.naturalHeight];
+  const g = st.meta[k];
+  st.boxes = g ? g.boxes.map(b => ({ cls: b.cls, box: b.box.slice() })) : [];
+  st.status = g ? g.status : "editing";
+  st.sel = -1; st.undo = []; st.redo = []; st.dirty = false;
+  fit(); renderList(); renderInfo(); draw();
+}
+
+const LV = { easy: "dễ", medium: "trung bình", hard: "khó" };
+function renderInfo() {
+  const m = st.pairs[st.keys[st.idx]], el = $("info");
+  if (!m) { el.textContent = "(không có pairs.json)"; return; }
+  const esc = (t) => t.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  el.innerHTML = `<div class="lv">${LV[m.level] || m.level || ""} · ${esc(m.category || "")}</div>` +
+    (m.focus ? `<div>${esc(m.focus)}</div>` : "") +
+    `<div style="margin-top:6px">Chữ prompt yêu cầu (model có thể vẽ sai / thiếu / thêm):</div><ul>` +
+    (m.texts || []).map(t => `<li class="${t.scene ? "scene" : ""}">${esc(t.text)}${t.scene ? " — chữ cảnh → P" : ""}</li>`).join("") + "</ul>" +
+    (m.scene_texts ? `<div style="margin-top:6px">Ảnh tham chiếu <code>${esc(m.ref || "")}</code>, chữ in trên sản phẩm (gán <b>P</b>):</div><ul>` +
+      m.scene_texts.map(t => `<li class="scene">${esc(t)}</li>`).join("") + "</ul>" : "");
+}
+
+async function save() {
+  if (st.idx < 0) return;
+  const k = st.keys[st.idx];
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const doc = { key: k, size: st.size, status: st.status,
+    boxes: st.boxes.map(b => ({ cls: b.cls, box: b.box.map(r1) })) };
+  const fh = await st.gtDir.getFileHandle(k + ".json", { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(doc, null, 1) + "\n");
+  await w.close();
+  st.meta[k] = doc; st.dirty = false;
+  renderList(); draw(); toast("đã lưu " + k);
+}
+
+function renderList() {
+  $("list").innerHTML = "";
+  st.keys.forEach((k, i) => {
+    const g = st.meta[k], s = g ? g.status : "chưa có";
+    const d = document.createElement("div");
+    d.className = "item" + (i === st.idx ? " cur" : "");
+    d.innerHTML = `<span>${k}</span><span class="badge ${s}">${s}</span>`;
+    d.onclick = () => openIdx(i);
+    $("list").appendChild(d);
+  });
+  const done = st.keys.filter(k => (st.meta[k] || {}).status === "done").length;
+  document.title = `Gán nhãn ô · ${done}/${st.keys.length} xong`;
+}
+
+// ------------------------------------------------------------------------------------------- lịch sử
+function snap() { st.undo.push(JSON.stringify(st.boxes)); if (st.undo.length > 200) st.undo.shift(); st.redo = []; touch(); }
+function touch() { st.dirty = true; if (st.status === "prefill") st.status = "editing"; }
+function undo() { if (!st.undo.length) return; st.redo.push(JSON.stringify(st.boxes)); st.boxes = JSON.parse(st.undo.pop()); st.sel = -1; touch(); draw(); }
+function redo() { if (!st.redo.length) return; st.undo.push(JSON.stringify(st.boxes)); st.boxes = JSON.parse(st.redo.pop()); st.sel = -1; touch(); draw(); }
+
+// ------------------------------------------------------------------------------------------- khung nhìn
+function fit() {
+  const r = cv.getBoundingClientRect(), [W, H] = st.size;
+  if (!W) return;
+  const s = Math.min(r.width / W, r.height / H) * 0.96;
+  st.view = { s, x: (r.width - W * s) / 2, y: (r.height - H * s) / 2 };
+}
+const toImg = (px, py) => [(px - st.view.x) / st.view.s, (py - st.view.y) / st.view.s];
+const toScr = (x, y) => [x * st.view.s + st.view.x, y * st.view.s + st.view.y];
+
+function draw() {
+  const dpr = window.devicePixelRatio || 1, r = cv.getBoundingClientRect();
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  if (!st.draft) return;
+  const [W, H] = st.size, v = st.view;
+  ctx.imageSmoothingEnabled = v.s < 2;
+  ctx.drawImage(st.showPlate ? st.plate : st.draft, v.x, v.y, W * v.s, H * v.s);
+  if (st.showDiff) ctx.drawImage(st.diff, v.x, v.y, W * v.s, H * v.s);
+  if (!st.hide) {
+    // khung to vẽ trước để khung nhỏ (dòng, chi tiết) nằm trên
+    const order = st.boxes.map((b, i) => i).sort((a, b) => area(st.boxes[b].box) - area(st.boxes[a].box));
+    for (const i of order) {
+      const b = st.boxes[i], [x0, y0] = toScr(b.box[0], b.box[1]), [x1, y1] = toScr(b.box[2], b.box[3]);
+      ctx.strokeStyle = COLORS[b.cls]; ctx.lineWidth = i === st.sel ? 3 : 1.5;
+      if (b.cls === "P") ctx.setLineDash([5, 3]);
+      ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
+      if (i === st.sel) {
+        ctx.fillStyle = COLORS[b.cls] + "22"; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        ctx.fillStyle = "#fff";
+        for (const [hx, hy] of handles(b.box)) { const [sx, sy] = toScr(hx, hy); ctx.fillRect(sx - 4, sy - 4, 8, 8); ctx.strokeRect(sx - 4, sy - 4, 8, 8); }
+      }
+      ctx.fillStyle = COLORS[b.cls]; ctx.font = "11px system-ui";
+      ctx.fillText(b.cls, x0 + 2, y0 - 3 > 10 ? y0 - 3 : y0 + 11);
+    }
+  }
+  if (st.drag && st.drag.mode === "new") {
+    const [x0, y0] = toScr(st.drag.box[0], st.drag.box[1]), [x1, y1] = toScr(st.drag.box[2], st.drag.box[3]);
+    ctx.strokeStyle = COLORS[st.cls]; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  const n = { L: 0, S: 0, I: 0, P: 0 }; st.boxes.forEach(b => n[b.cls]++);
+  $("key").textContent = st.keys[st.idx] || "—";
+  $("counts").textContent = `L ${n.L} · S ${n.S} · I ${n.I} · P ${n.P}`;
+  $("status").innerHTML = `${st.status}${st.dirty ? ' <span class="dirty">● chưa lưu</span>' : ""}${st.showPlate ? " · BẢN XOÁ" : ""}${st.showDiff ? " · lớp phủ" : ""}`;
+  document.querySelectorAll("#cls button").forEach(b => b.classList.toggle("on", b.dataset.c === st.cls));
+}
+const area = (b) => (b[2] - b[0]) * (b[3] - b[1]);
+function handles(b) {
+  const mx = (b[0] + b[2]) / 2, my = (b[1] + b[3]) / 2;
+  return [[b[0], b[1]], [mx, b[1]], [b[2], b[1]], [b[2], my], [b[2], b[3]], [mx, b[3]], [b[0], b[3]], [b[0], my]];
+}
+const HANDLE_EDGES = [["x0", "y0"], ["y0"], ["x1", "y0"], ["x1"], ["x1", "y1"], ["y1"], ["x0", "y1"], ["x0"]];
+
+function norm(b) { return [Math.min(b[0], b[2]), Math.min(b[1], b[3]), Math.max(b[0], b[2]), Math.max(b[1], b[3])]; }
+function clampBox(b) { const [W, H] = st.size; return [Math.max(0, b[0]), Math.max(0, b[1]), Math.min(W, b[2]), Math.min(H, b[3])]; }
+
+// ------------------------------------------------------------------------------------------- chuột
+function hit(px, py) {
+  // ưu tiên ô vuông đổi cỡ của khung đang chọn, rồi khung NHỎ NHẤT chứa điểm
+  if (st.sel >= 0) {
+    const hs = handles(st.boxes[st.sel].box);
+    for (let k = 0; k < 8; k++) { const [sx, sy] = toScr(hs[k][0], hs[k][1]); if (Math.abs(sx - px) <= 6 && Math.abs(sy - py) <= 6) return { i: st.sel, h: k }; }
+  }
+  const [x, y] = toImg(px, py);
+  let best = -1;
+  st.boxes.forEach((b, i) => { if (x >= b.box[0] && x <= b.box[2] && y >= b.box[1] && y <= b.box[3] && (best < 0 || area(b.box) < area(st.boxes[best].box))) best = i; });
+  return { i: best, h: -1 };
+}
+
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("mousedown", e => {
+  if (!st.draft) return;
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (e.button === 1 || e.button === 2) { st.drag = { mode: "pan", px, py, vx: st.view.x, vy: st.view.y }; return; }
+  const h = st.hide ? { i: -1, h: -1 } : hit(px, py), [x, y] = toImg(px, py);
+  if (h.i >= 0 && h.i === st.sel) {   // khung đang chọn: dời hoặc đổi cỡ
+    st.drag = { mode: h.h >= 0 ? "resize" : "move", h: h.h, x, y, orig: st.boxes[st.sel].box.slice(), snapped: false };
+  } else {                           // chỗ khác: bấm = chọn, kéo = vẽ khung mới
+    st.drag = { mode: "pending", x, y, px, py, hit: h.i, box: [x, y, x, y] };
+  }
+});
+window.addEventListener("mousemove", e => {
+  const d = st.drag; if (!d) return;
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, [x, y] = toImg(px, py);
+  if (d.mode === "pan") { st.view.x = d.vx + px - d.px; st.view.y = d.vy + py - d.py; draw(); return; }
+  if (d.mode === "pending" && Math.hypot(px - d.px, py - d.py) > 4) d.mode = "new";
+  if (d.mode === "new") { d.box = [d.x, d.y, x, y]; draw(); return; }
+  if (d.mode === "move" || d.mode === "resize") {
+    if (!d.snapped) { snap(); d.snapped = true; }
+    const o = d.orig, dx = x - d.x, dy = y - d.y;
+    let b;
+    if (d.mode === "move") b = [o[0] + dx, o[1] + dy, o[2] + dx, o[3] + dy];
+    else { b = o.slice(); for (const ed of HANDLE_EDGES[d.h]) { const k = { x0: 0, y0: 1, x1: 2, y1: 3 }[ed]; b[k] = o[k] + (k % 2 ? dy : dx); } }
+    st.boxes[st.sel].box = clampBox(norm(b)); draw();
+  }
+});
+window.addEventListener("mouseup", () => {
+  const d = st.drag; st.drag = null; if (!d) return;
+  if (d.mode === "pending") st.sel = d.hit;
+  else if (d.mode === "new") {
+    const b = clampBox(norm(d.box));
+    if (b[2] - b[0] >= 2 && b[3] - b[1] >= 2) { snap(); st.boxes.push({ cls: st.cls, box: b }); st.sel = st.boxes.length - 1; }
+  }
+  draw();
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, [x, y] = toImg(px, py);
+  st.view.s = Math.min(16, Math.max(0.05, st.view.s * Math.exp(-e.deltaY * 0.0015)));
+  st.view.x = px - x * st.view.s; st.view.y = py - y * st.view.s; draw();
+}, { passive: false });
+
+// ------------------------------------------------------------------------------------------- phím
+function setCls(c) {
+  st.cls = c;
+  if (st.sel >= 0 && st.boxes[st.sel].cls !== c) { snap(); st.boxes[st.sel].cls = c; }
+  draw();
+}
+document.querySelectorAll("#cls button").forEach(b => b.onclick = () => setCls(b.dataset.c));
+$("save").onclick = () => save();
+$("keys").onclick = () => toggleHelp();
+function toggleHelp() { const h = $("help"); h.style.display = h.style.display === "none" ? "" : "none"; }
+$("done").onclick = () => markDone();
+async function markDone() { if (st.idx < 0) return; st.status = "done"; st.dirty = true; await save(); if (st.idx + 1 < st.keys.length) openIdx(st.idx + 1); }
+
+window.addEventListener("keydown", e => {
+  if (st.idx < 0) return;
+  const k = e.key;
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "s") { e.preventDefault(); save(); return; }
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
+  if (k === " ") { e.preventDefault(); if (!st.showPlate) { st.showPlate = true; draw(); } return; }
+  if (["1", "2", "3", "4"].includes(k)) { setCls("LSIP"[+k - 1]); return; }
+  if (k === "Delete" || k === "Backspace") { if (st.sel >= 0) { snap(); st.boxes.splice(st.sel, 1); st.sel = -1; draw(); } return; }
+  if (k === "Escape") { st.sel = -1; draw(); return; }
+  if (k === "d" || k === "D") { st.showDiff = !st.showDiff; draw(); return; }
+  if (k === "h" || k === "H") { st.hide = !st.hide; draw(); return; }
+  if (k === "f" || k === "F") { fit(); draw(); return; }
+  if (k === "?") { toggleHelp(); return; }
+  if (k === "[" || k === "PageUp") { openIdx(st.idx - 1); return; }
+  if (k === "]" || k === "PageDown") { openIdx(st.idx + 1); return; }
+  if (k === "Enter") { e.preventDefault(); markDone(); return; }
+  if (k.startsWith("Arrow") && st.sel >= 0) {
+    e.preventDefault(); snap();
+    const n = e.shiftKey ? 10 : 1, b = st.boxes[st.sel].box;
+    const dx = k === "ArrowLeft" ? -n : k === "ArrowRight" ? n : 0, dy = k === "ArrowUp" ? -n : k === "ArrowDown" ? n : 0;
+    // Alt: nới / thu mép theo hướng mũi tên (trái/lên nới mép trái/trên, phải/xuống nới mép phải/dưới)
+    const nb = e.altKey ? [b[0] + Math.min(dx, 0), b[1] + Math.min(dy, 0), b[2] + Math.max(dx, 0), b[3] + Math.max(dy, 0)]
+                        : [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy];
+    st.boxes[st.sel].box = clampBox(norm(nb)); draw();
+  }
+});
+window.addEventListener("keyup", e => { if (e.key === " ") { st.showPlate = false; draw(); } });
+// nút giữ focus thì Space / Enter bấm lại nút: bỏ focus sau mỗi lần bấm
+document.querySelectorAll("button").forEach(b => b.addEventListener("click", () => b.blur()));
+window.addEventListener("resize", () => draw());
+window.addEventListener("beforeunload", e => { if (st.dirty) { e.preventDefault(); e.returnValue = ""; } });
+draw();
+</script>
+</body>
+</html>

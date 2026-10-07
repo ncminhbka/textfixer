@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """THỬ ENGINE trên bộ prompt cố định (bench/prompts_C.json: prompt FLUX + câu khách + cỡ), nhìn bằng mắt.
 
-  python scripts/probe.py                               # máy chủ: FLUX distill vẽ nháp + xoá, VLM thật
+  %run scripts/probe.py                                 # máy chủ, trong ô notebook: FLUX distill vẽ nháp + xoá, VLM thật;
+                                                        # cuối cùng gói output/probe thành zip < 27 MB và tự tải về
+  python scripts/probe.py                               # terminal: như trên, zip ở output/probe_zip/ (tải tay)
   python scripts/probe.py --only p11_distill_s4,q21_distill_s0
   python scripts/probe.py --data <thư mục>              # dùng nháp / bản xoá có sẵn: <key>_draft.png (+ <key>_plate.png)
   python scripts/probe.py --data <thư mục> --dry        # không VLM (lệnh giả: vỏ tô màu đo, chi tiết = chấm, chữ = chữ OCR):
                                                         # kiểm phần đo / dựng ở máy không GPU, không mạng
 
-Ra output/probe/<key>.jpg (nháp | ô | bản xoá | poster), <key>_plan.json (ô, lệnh, lỗi, nhật ký, thời gian), <key>_poster.png.
+Ra output/probe/<key>.jpg (nháp | ô | bản xoá | poster), <key>_plan.json (ô, lệnh, lỗi, nhật ký, thời gian), <key>_poster.png;
+gói output/probe_zip/probe_NN.zip (--no-ship: không gói).
 """
 
 from __future__ import annotations
@@ -55,6 +58,7 @@ def main() -> int:
     ap.add_argument("--plate-suffix", default="plate", help="bản xoá có sẵn: <key>_<hậu tố>.png")
     ap.add_argument("--dry", action="store_true", help="VLM giả (kiểm đo / dựng)")
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "output" / "probe")
+    ap.add_argument("--no-ship", action="store_true", help="không gói / tải zip")
     a = ap.parse_args()
     config.load_env()
     jobs = [j for j in json.loads(a.set.read_text(encoding="utf-8")) if not a.only or j["key"] in a.only.split(",")]
@@ -69,8 +73,13 @@ def main() -> int:
     with Engine(F, progress=lambda m: print("   ..", m, flush=True), llm=fake, vlm=fake) as E:
         for j in jobs:
             k = j["key"]
-            seed = int(k.rsplit("_s", 1)[1]) if "_s" in k else 0
-            B = {"prompt_en": j["prompt"], "texts": j["texts"]}
+            seed = int(k.rsplit("_s", 1)[1]) if "_s" in k else (j.get("seeds") or [0])[0]
+            B = {"prompt_en": j["prompt"], "texts": [t for t in j["texts"] if not t.get("scene")]}
+            product = None
+            if j.get("ref"):   # ảnh sản phẩm người dùng tải lên (bench/refs), thu nhỏ như máy chủ
+                im = Image.open(ROOT / j["ref"]).convert("RGB")
+                im.thumbnail((1024, 1024))
+                product = np.asarray(im)
             t0 = time.time()
             try:
                 if a.data is not None and (a.data / f"{k}_draft.png").exists():
@@ -79,7 +88,7 @@ def main() -> int:
                     plate = np.asarray(Image.open(pf).convert("RGB").resize((draft.shape[1], draft.shape[0]))) if pf.exists() else None
                     r = E.fix(draft, B, seed, plate)
                 else:
-                    r = E.make(B, j["w"], j["h"], seed)
+                    r = E.make(B, j["w"], j["h"], seed, product)
             except Exception as e:
                 print(f"{k}: LỖI {type(e).__name__}: {str(e)[:300]}", flush=True)
                 continue
@@ -101,6 +110,9 @@ def main() -> int:
             print(f"{k}: lệnh {kinds}; lỗi {len(r['plan']['errors'])}; thiếu {len(r['plan']['missing'])}; {r['timing']} "
                   f"({time.time() - t0:.0f}s)", flush=True)
     print(f"xong: {a.out}/<key>.jpg")
+    if not a.no_ship:
+        from textfix import ship
+        ship.offer(ship.pack_dir(a.out, a.out.parent / f"{a.out.name}_zip", a.out.name))
     return 0
 
 

@@ -1,0 +1,886 @@
+[
+ {
+  "key": "e01",
+  "level": "easy",
+  "category": "promo",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0
+  ],
+  "focus": "2 dòng chữ trần trên nền trơn",
+  "prompt": "Minimal promotion poster, a single glass of iced peach tea with lemongrass on a plain pastel orange background, soft studio light, lots of empty space. Headline \"TRÀ ĐÀO CAM SẢ\" in a big bold white rounded sans-serif at the top center. Right below it the offer \"Giảm 20%\" in bold dark orange. No other text.",
+  "texts": [
+   {
+    "text": "TRÀ ĐÀO CAM SẢ",
+    "role": "headline"
+   },
+   {
+    "text": "Giảm 20%",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "e02",
+  "level": "easy",
+  "category": "opening",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0
+  ],
+  "focus": "chữ serif mảnh, dòng ngày nhỏ",
+  "prompt": "Grand opening poster for a small bakery, warm crusty bread loaves on a rustic wooden table, cozy morning window light. Headline \"KHAI TRƯƠNG\" in a large elegant serif at the top center. Under it the date \"Chủ Nhật, 19/10/2026\" in a thin serif. Store name \"Tiệm Bánh Mộc\" centered at the bottom in a small serif. No other text.",
+  "texts": [
+   {
+    "text": "KHAI TRƯƠNG",
+    "role": "headline"
+   },
+   {
+    "text": "Chủ Nhật, 19/10/2026",
+    "role": "date"
+   },
+   {
+    "text": "Tiệm Bánh Mộc",
+    "role": "info"
+   }
+  ]
+ },
+ {
+  "key": "e03",
+  "level": "easy",
+  "category": "product_intro",
+  "ratio": "16:9",
+  "w": 1344,
+  "h": 768,
+  "seeds": [
+   0
+  ],
+  "focus": "banner ngang, chữ trái, sản phẩm phải",
+  "prompt": "Wide product banner, premium black wireless over-ear headphones on the right side over a dark grey gradient, rim light. Left side text block: product name \"Tai nghe Sonic Pro\" in a bold white sans-serif, below it \"Chống ồn chủ động\" in a light grey sans-serif. No other text.",
+  "texts": [
+   {
+    "text": "Tai nghe Sonic Pro",
+    "role": "headline"
+   },
+   {
+    "text": "Chống ồn chủ động",
+    "role": "subheadline"
+   }
+  ]
+ },
+ {
+  "key": "e04",
+  "level": "easy",
+  "category": "recruitment",
+  "ratio": "9:16",
+  "w": 768,
+  "h": 1344,
+  "seeds": [
+   0
+  ],
+  "focus": "story dọc, chữ trên ảnh chụp",
+  "prompt": "Vertical story poster, close-up of a barista pouring latte art into a ceramic cup, warm brown tones, shallow depth of field. Headline \"TUYỂN PHA CHẾ\" in a bold white condensed sans-serif at the top. At the bottom the line \"Hạn nộp: 30/10/2026\" in white. No other text.",
+  "texts": [
+   {
+    "text": "TUYỂN PHA CHẾ",
+    "role": "headline"
+   },
+   {
+    "text": "Hạn nộp: 30/10/2026",
+    "role": "date"
+   }
+  ]
+ },
+ {
+  "key": "m01",
+  "level": "medium",
+  "category": "promo",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "huy hiệu tròn, nút pill, icon điện thoại",
+  "prompt": "Flash sale poster for running shoes, a pair of bright red running shoes floating with motion streaks on a black background, dynamic lighting. Small store name \"RunZone\" at the top left. Headline \"FLASH SALE\" in a huge bold italic white sans-serif. A big red circle badge with \"-50%\" in bold white. Date line \"Từ 25/10 đến 31/10/2026\" in white. A rounded yellow pill button \"Mua ngay\" with black text. Bottom line with a small phone icon: \"Hotline 1900 6868\".",
+  "texts": [
+   {
+    "text": "RunZone",
+    "role": "label"
+   },
+   {
+    "text": "FLASH SALE",
+    "role": "headline"
+   },
+   {
+    "text": "-50%",
+    "role": "offer"
+   },
+   {
+    "text": "Từ 25/10 đến 31/10/2026",
+    "role": "date"
+   },
+   {
+    "text": "Mua ngay",
+    "role": "cta"
+   },
+   {
+    "text": "Hotline 1900 6868",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "m02",
+  "level": "medium",
+  "category": "product_intro",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "danh sách 3 ý có icon lá, thẻ giá",
+  "prompt": "Skincare product poster, a glass dropper bottle of green serum on wet pebbles with fresh centella leaves, clean bright light, white and mint green palette. Product name \"Serum Rau Má\" in an elegant dark green serif at the top. Description \"Làm dịu da, giảm mụn sau 7 ngày\" in a small sans-serif. A list of three benefits, each line starting with a small green leaf icon: \"Thuần chay 100%\", \"Không cồn, không hương liệu\", \"Cho mọi loại da\". A rounded dark green price tag with \"450.000đ\" in white.",
+  "texts": [
+   {
+    "text": "Serum Rau Má",
+    "role": "headline"
+   },
+   {
+    "text": "Làm dịu da, giảm mụn sau 7 ngày",
+    "role": "body"
+   },
+   {
+    "text": "Thuần chay 100%",
+    "role": "list_item"
+   },
+   {
+    "text": "Không cồn, không hương liệu",
+    "role": "list_item"
+   },
+   {
+    "text": "Cho mọi loại da",
+    "role": "list_item"
+   },
+   {
+    "text": "450.000đ",
+    "role": "price"
+   }
+  ]
+ },
+ {
+  "key": "m03",
+  "level": "medium",
+  "category": "opening",
+  "ratio": "16:9",
+  "w": 1344,
+  "h": 768,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "dải băng đỏ, pill ưu đãi, địa chỉ + điện thoại có icon",
+  "prompt": "Wide grand opening banner for a coffee shop, cozy cafe interior with hanging lights on the right, festive confetti. On the left a red ribbon band with \"KHAI TRƯƠNG\" in bold white. Store name \"Mây Coffee\" in a script font. Date \"Thứ Bảy, 15/10/2026\" in bold. A rounded orange pill with \"Giảm 50% toàn menu 3 ngày đầu\". Footer lines with small icons: a map pin icon then \"123 Hoàng Hoa Thám, Ba Đình, Hà Nội\", a phone icon then \"0988 123 456\".",
+  "texts": [
+   {
+    "text": "KHAI TRƯƠNG",
+    "role": "headline"
+   },
+   {
+    "text": "Mây Coffee",
+    "role": "label"
+   },
+   {
+    "text": "Thứ Bảy, 15/10/2026",
+    "role": "date"
+   },
+   {
+    "text": "Giảm 50% toàn menu 3 ngày đầu",
+    "role": "offer"
+   },
+   {
+    "text": "123 Hoàng Hoa Thám, Ba Đình, Hà Nội",
+    "role": "contact"
+   },
+   {
+    "text": "0988 123 456",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "m04",
+  "level": "medium",
+  "category": "feedback",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "một thẻ bình luận: avatar, tên, hàng sao, trích dẫn",
+  "prompt": "Customer testimonial poster for a spa, soft beige background with eucalyptus leaves and a candle, calm warm light. Headline \"KHÁCH HÀNG NÓI GÌ\" in a bold brown serif at the top. A white rounded review card in the middle with a circular customer avatar photo on the left, the name \"Chị Lan, Hà Nội\" in bold, a row of five gold stars under the name, and the quote \"Nhân viên chu đáo, da mình căng bóng sau buổi đầu tiên!\" in italic. Store name \"An Nhiên Spa\" at the bottom.",
+  "texts": [
+   {
+    "text": "KHÁCH HÀNG NÓI GÌ",
+    "role": "headline"
+   },
+   {
+    "text": "Chị Lan, Hà Nội",
+    "role": "review_name"
+   },
+   {
+    "text": "Nhân viên chu đáo, da mình căng bóng sau buổi đầu tiên!",
+    "role": "review_quote"
+   },
+   {
+    "text": "An Nhiên Spa",
+    "role": "label"
+   }
+  ]
+ },
+ {
+  "key": "m05",
+  "level": "medium",
+  "category": "guide",
+  "ratio": "9:16",
+  "w": 768,
+  "h": 1344,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "3 bước có vòng tròn đánh số",
+  "prompt": "Vertical how-to poster for online food ordering, flat illustration style, light blue background with a delivery scooter at the bottom. Headline \"ĐẶT HÀNG CHỈ 3 BƯỚC\" in bold dark blue at the top. Three steps stacked vertically, each with a filled orange circle containing a white number 1, 2, 3 and the step text on the right: \"Chọn món trên website\", \"Thanh toán online\", \"Nhận hàng trong 30 phút\". Website \"mayfood.vn\" at the bottom.",
+  "texts": [
+   {
+    "text": "ĐẶT HÀNG CHỈ 3 BƯỚC",
+    "role": "headline"
+   },
+   {
+    "text": "Chọn món trên website",
+    "role": "list_item"
+   },
+   {
+    "text": "Thanh toán online",
+    "role": "list_item"
+   },
+   {
+    "text": "Nhận hàng trong 30 phút",
+    "role": "list_item"
+   },
+   {
+    "text": "mayfood.vn",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "h01",
+  "level": "hard",
+  "category": "feedback",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "3 thẻ bình luận, mỗi thẻ avatar + tên + sao + trích dẫn; chân trang có icon",
+  "prompt": "Customer feedback poster for a fitness gym, dark charcoal background with a blurred gym on the edges, red accents. Headline \"HỌC VIÊN NÓI GÌ\" in a bold white condensed sans-serif at the top. Three white rounded review cards stacked vertically, each card with a small circular avatar photo on the left, a bold name, a row of five gold stars, and a short quote: card 1 \"Anh Tuấn\" with \"Giảm 8kg sau 2 tháng, PT rất tận tâm\", card 2 \"Chị Hoa\" with \"Lịch tập linh hoạt, phòng tập sạch sẽ\", card 3 \"Bạn Minh\" with \"Tăng cơ rõ rệt, giá hợp lý\". A red pill at the bottom with \"Tặng 1 tuần tập thử\". Footer with a phone icon and \"0912 345 678\" and a map pin icon and \"45 Lê Lợi, Quận 1\".",
+  "texts": [
+   {
+    "text": "HỌC VIÊN NÓI GÌ",
+    "role": "headline"
+   },
+   {
+    "text": "Anh Tuấn",
+    "role": "review_name"
+   },
+   {
+    "text": "Giảm 8kg sau 2 tháng, PT rất tận tâm",
+    "role": "review_quote"
+   },
+   {
+    "text": "Chị Hoa",
+    "role": "review_name"
+   },
+   {
+    "text": "Lịch tập linh hoạt, phòng tập sạch sẽ",
+    "role": "review_quote"
+   },
+   {
+    "text": "Bạn Minh",
+    "role": "review_name"
+   },
+   {
+    "text": "Tăng cơ rõ rệt, giá hợp lý",
+    "role": "review_quote"
+   },
+   {
+    "text": "Tặng 1 tuần tập thử",
+    "role": "offer"
+   },
+   {
+    "text": "0912 345 678",
+    "role": "contact"
+   },
+   {
+    "text": "45 Lê Lợi, Quận 1",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "h02",
+  "level": "hard",
+  "category": "promo",
+  "ratio": "9:16",
+  "w": 768,
+  "h": 1344,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "menu 2 cột 6 món kèm giá, giá gạch, huy hiệu, chân trang 3 icon",
+  "prompt": "Vertical milk tea menu poster, cream background with illustrated tapioca pearls and tea leaves, cute playful style. Headline \"MENU TRÀ SỮA\" in a bold brown rounded font at the top, a red starburst badge \"-30%\" next to it. Below, a two-column menu list, each item name with its price on the right: \"Trà sữa trân châu\" \"35.000đ\", \"Trà sữa matcha\" \"39.000đ\", \"Hồng trà kem cheese\" \"42.000đ\", \"Trà đào cam sả\" \"32.000đ\", \"Sữa tươi đường đen\" \"38.000đ\", \"Trà xoài\" \"30.000đ\". The old price \"45.000đ\" shown crossed out next to the first item. Footer row with three small icons: phone \"0988 123 456\", map pin \"12 Trần Phú, Hà Đông\", globe \"maytea.vn\".",
+  "texts": [
+   {
+    "text": "MENU TRÀ SỮA",
+    "role": "headline"
+   },
+   {
+    "text": "-30%",
+    "role": "offer"
+   },
+   {
+    "text": "Trà sữa trân châu",
+    "role": "list_item"
+   },
+   {
+    "text": "35.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Trà sữa matcha",
+    "role": "list_item"
+   },
+   {
+    "text": "39.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Hồng trà kem cheese",
+    "role": "list_item"
+   },
+   {
+    "text": "42.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Trà đào cam sả",
+    "role": "list_item"
+   },
+   {
+    "text": "32.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Sữa tươi đường đen",
+    "role": "list_item"
+   },
+   {
+    "text": "38.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Trà xoài",
+    "role": "list_item"
+   },
+   {
+    "text": "30.000đ",
+    "role": "price"
+   },
+   {
+    "text": "45.000đ",
+    "role": "old_price"
+   },
+   {
+    "text": "0988 123 456",
+    "role": "contact"
+   },
+   {
+    "text": "12 Trần Phú, Hà Đông",
+    "role": "contact"
+   },
+   {
+    "text": "maytea.vn",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "h03",
+  "level": "hard",
+  "category": "guide",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "4 thẻ bước, mỗi thẻ icon + số + tiêu đề + mô tả; mũi tên giữa các thẻ",
+  "prompt": "How-to poster for a shopping app, clean white background with soft purple gradients, flat modern UI style. Headline \"MUA SẮM DỄ DÀNG VỚI 4 BƯỚC\" in bold purple at the top. A 2x2 grid of four rounded light purple cards connected by small arrows, each card with a purple circle icon (shopping cart, credit card, delivery truck, gift box), a step title in bold and a short description below: \"Chọn sản phẩm\" \"Hơn 10.000 mặt hàng\", \"Thanh toán\" \"Ví điện tử, thẻ, COD\", \"Giao hàng\" \"Nhanh trong 2 giờ\", \"Nhận quà\" \"Tích điểm mỗi đơn\". Website \"shopnhanh.vn\" at the bottom with a globe icon.",
+  "texts": [
+   {
+    "text": "MUA SẮM DỄ DÀNG VỚI 4 BƯỚC",
+    "role": "headline"
+   },
+   {
+    "text": "Chọn sản phẩm",
+    "role": "list_item"
+   },
+   {
+    "text": "Hơn 10.000 mặt hàng",
+    "role": "body"
+   },
+   {
+    "text": "Thanh toán",
+    "role": "list_item"
+   },
+   {
+    "text": "Ví điện tử, thẻ, COD",
+    "role": "body"
+   },
+   {
+    "text": "Giao hàng",
+    "role": "list_item"
+   },
+   {
+    "text": "Nhanh trong 2 giờ",
+    "role": "body"
+   },
+   {
+    "text": "Nhận quà",
+    "role": "list_item"
+   },
+   {
+    "text": "Tích điểm mỗi đơn",
+    "role": "body"
+   },
+   {
+    "text": "shopnhanh.vn",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "h06",
+  "level": "hard",
+  "category": "recruitment",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "4 vị trí có icon + pill lương; hàng 3 phúc lợi có icon; liên hệ dày",
+  "prompt": "Recruitment poster for a technology company, clean white and corporate blue design with abstract geometric shapes. Company \"Sao Việt Tech\" small at the top left. Headline \"TUYỂN DỤNG\" in a huge bold blue sans-serif. Four job rows, each with a small blue icon, the position name and a blue pill with the salary: \"Lập trình viên Backend\" \"20-35 triệu\", \"Kiểm thử phần mềm\" \"15-25 triệu\", \"Thiết kế UI/UX\" \"18-30 triệu\", \"Chuyên viên DevOps\" \"25-40 triệu\". A row of three benefit icons with labels: \"Thưởng tháng 13\", \"Bảo hiểm đầy đủ\", \"Làm việc hybrid\". Deadline \"Hạn nộp: 15/11/2026\". Contact lines with icons: mail \"hr@saoviet.vn\", phone \"024 3999 8888\".",
+  "texts": [
+   {
+    "text": "Sao Việt Tech",
+    "role": "label"
+   },
+   {
+    "text": "TUYỂN DỤNG",
+    "role": "headline"
+   },
+   {
+    "text": "Lập trình viên Backend",
+    "role": "list_item"
+   },
+   {
+    "text": "20-35 triệu",
+    "role": "info"
+   },
+   {
+    "text": "Kiểm thử phần mềm",
+    "role": "list_item"
+   },
+   {
+    "text": "15-25 triệu",
+    "role": "info"
+   },
+   {
+    "text": "Thiết kế UI/UX",
+    "role": "list_item"
+   },
+   {
+    "text": "18-30 triệu",
+    "role": "info"
+   },
+   {
+    "text": "Chuyên viên DevOps",
+    "role": "list_item"
+   },
+   {
+    "text": "25-40 triệu",
+    "role": "info"
+   },
+   {
+    "text": "Thưởng tháng 13",
+    "role": "list_item"
+   },
+   {
+    "text": "Bảo hiểm đầy đủ",
+    "role": "list_item"
+   },
+   {
+    "text": "Làm việc hybrid",
+    "role": "list_item"
+   },
+   {
+    "text": "Hạn nộp: 15/11/2026",
+    "role": "date"
+   },
+   {
+    "text": "hr@saoviet.vn",
+    "role": "contact"
+   },
+   {
+    "text": "024 3999 8888",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "h07",
+  "level": "hard",
+  "category": "product_intro",
+  "ratio": "9:16",
+  "w": 768,
+  "h": 1344,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "thông số có icon + pill trả góp, chữ trắng trên nền tối có ánh sáng",
+  "prompt": "Vertical smartphone launch poster, a sleek titanium smartphone tilted at an angle on a dark purple gradient with glowing light, the phone screen shows a colorful abstract wallpaper. Headline \"NOVA X5\" in a wide tracked uppercase white font at the top, subheadline \"Mạnh mẽ trong tầm tay\". Spec list with small white line icons: battery \"Pin 5000 mAh\", camera \"Camera 108 MP\", chip \"Chip 4nm\". Price \"8.990.000đ\" in bold. A purple pill \"Trả góp 0%\".",
+  "texts": [
+   {
+    "text": "NOVA X5",
+    "role": "headline"
+   },
+   {
+    "text": "Mạnh mẽ trong tầm tay",
+    "role": "subheadline"
+   },
+   {
+    "text": "Pin 5000 mAh",
+    "role": "list_item"
+   },
+   {
+    "text": "Camera 108 MP",
+    "role": "list_item"
+   },
+   {
+    "text": "Chip 4nm",
+    "role": "list_item"
+   },
+   {
+    "text": "8.990.000đ",
+    "role": "price"
+   },
+   {
+    "text": "Trả góp 0%",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "h08",
+  "level": "hard",
+  "category": "opening",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "lễ hội rực rỡ, dải nửa trong suốt, 3 ưu đãi trong vòng tròn, liên hệ dày",
+  "prompt": "Festive grand opening poster for a beauty salon, red and gold balloons, ribbons and confetti, bright celebratory light. Headline \"KHAI TRƯƠNG\" in a huge bold gold font with a red outline on a red ribbon band. Store name \"Bông Beauty\" in a pink script font. Three gold circle badges in a row, each with an offer: \"Giảm 50%\", \"Tặng quà\", \"Bốc thăm\". Date \"Thứ Sáu, 01/11/2026\". A semi-transparent dark band at the bottom with contact lines and small icons: map pin \"88 Nguyễn Trãi, Thanh Xuân, Hà Nội\", phone \"0904 222 333\", fanpage \"fb.com/bongbeauty\".",
+  "texts": [
+   {
+    "text": "KHAI TRƯƠNG",
+    "role": "headline"
+   },
+   {
+    "text": "Bông Beauty",
+    "role": "label"
+   },
+   {
+    "text": "Giảm 50%",
+    "role": "offer"
+   },
+   {
+    "text": "Tặng quà",
+    "role": "offer"
+   },
+   {
+    "text": "Bốc thăm",
+    "role": "offer"
+   },
+   {
+    "text": "Thứ Sáu, 01/11/2026",
+    "role": "date"
+   },
+   {
+    "text": "88 Nguyễn Trãi, Thanh Xuân, Hà Nội",
+    "role": "contact"
+   },
+   {
+    "text": "0904 222 333",
+    "role": "contact"
+   },
+   {
+    "text": "fb.com/bongbeauty",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "r01",
+  "level": "hard",
+  "category": "product_intro",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "CHỮ TRÊN CHAI (ảnh tham chiếu) + kính mờ nửa trong suốt + giá gạch + nút",
+  "prompt": "Shampoo product poster featuring exactly the product from image 1, standing among fresh green leaves and water splashes, bright fresh light, white and soft blue palette. Product name \"Dầu gội Dove Phục Hồi Hư Tổn\" in bold dark blue at the top. A frosted semi-transparent glass panel on the left holding four lines, each starting with a blue check icon: \"Phục hồi tóc hư tổn\", \"Giảm gãy rụng\", \"Mềm mượt từ lần gội đầu\", \"Hương hoa dịu nhẹ\". Price \"129.000đ\" in big bold blue with the old price \"159.000đ\" crossed out next to it. A rounded blue button \"Mua ngay\".",
+  "texts": [
+   {
+    "text": "Dầu gội Dove Phục Hồi Hư Tổn",
+    "role": "headline"
+   },
+   {
+    "text": "Phục hồi tóc hư tổn",
+    "role": "list_item"
+   },
+   {
+    "text": "Giảm gãy rụng",
+    "role": "list_item"
+   },
+   {
+    "text": "Mềm mượt từ lần gội đầu",
+    "role": "list_item"
+   },
+   {
+    "text": "Hương hoa dịu nhẹ",
+    "role": "list_item"
+   },
+   {
+    "text": "129.000đ",
+    "role": "price"
+   },
+   {
+    "text": "159.000đ",
+    "role": "old_price"
+   },
+   {
+    "text": "Mua ngay",
+    "role": "cta"
+   }
+  ],
+  "ref": "bench/refs/dove_shampoo.jpg",
+  "scene_texts": [
+   "Dove",
+   "INTENSE REPAIR",
+   "NOURISHING SHAMPOO",
+   "For Damaged Hair"
+  ]
+ },
+ {
+  "key": "r02",
+  "level": "medium",
+  "category": "promo",
+  "ratio": "1:1",
+  "w": 1024,
+  "h": 1024,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "CHỮ TIẾNG VIỆT CÓ DẤU in cong trên bánh (ảnh tham chiếu) + huy hiệu + chân trang",
+  "prompt": "Promotion poster for a traditional bakery featuring exactly the cake from image 1 on a ceramic plate next to a pot of hot tea, warm wooden table, soft golden light, Vietnamese traditional style with red and gold accents. Headline \"BÁNH PÍA SÓC TRĂNG\" in a bold red serif at the top. A gold circle badge \"Mua 5 tặng 1\". Price line \"45.000đ / cái\" in bold. Footer with a phone icon and \"0907 555 123\".",
+  "texts": [
+   {
+    "text": "BÁNH PÍA SÓC TRĂNG",
+    "role": "headline"
+   },
+   {
+    "text": "Mua 5 tặng 1",
+    "role": "offer"
+   },
+   {
+    "text": "45.000đ / cái",
+    "role": "price"
+   },
+   {
+    "text": "0907 555 123",
+    "role": "contact"
+   }
+  ],
+  "ref": "bench/refs/banh_pia.jpg",
+  "scene_texts": [
+   "BÁNH NGỌT ĐẬU XANH",
+   "ĐẬU",
+   "TÂN HUÊ VIÊN",
+   "ĐẶC BIỆT"
+  ]
+ },
+ {
+  "key": "r03",
+  "level": "hard",
+  "category": "promo",
+  "ratio": "9:16",
+  "w": 768,
+  "h": 1344,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "CHỮ TRÊN LON KIM LOẠI (ảnh tham chiếu) + 3 ưu đãi trong pill + chân trang tối",
+  "prompt": "Vertical beer promotion poster featuring exactly the beer can from image 1 with cold water droplets, ice cubes and a frosty glass of beer, dark navy background with golden light. Headline \"BIA LẠNH CUỐI TUẦN\" in a bold gold condensed sans-serif at the top. Three stacked rounded gold pills with dark text: \"Thùng 24 lon 399.000đ\", \"Giao nhanh trong 1 giờ\", \"Tặng 2 ly thủy tinh\". A dark band at the bottom with a phone icon and \"Đặt hàng 1900 2468\" in white. Small text \"Đã đủ 18 tuổi\" at the very bottom.",
+  "texts": [
+   {
+    "text": "BIA LẠNH CUỐI TUẦN",
+    "role": "headline"
+   },
+   {
+    "text": "Thùng 24 lon 399.000đ",
+    "role": "offer"
+   },
+   {
+    "text": "Giao nhanh trong 1 giờ",
+    "role": "offer"
+   },
+   {
+    "text": "Tặng 2 ly thủy tinh",
+    "role": "offer"
+   },
+   {
+    "text": "Đặt hàng 1900 2468",
+    "role": "contact"
+   },
+   {
+    "text": "Đã đủ 18 tuổi",
+    "role": "info"
+   }
+  ],
+  "ref": "bench/refs/sapporo_can.jpg",
+  "scene_texts": [
+   "SAPPORO",
+   "PREMIUM BEER"
+  ]
+ },
+ {
+  "key": "r04",
+  "level": "hard",
+  "category": "promo",
+  "ratio": "16:9",
+  "w": 1344,
+  "h": 768,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "CHỮ VIẾT TAY TRÊN LON (ảnh tham chiếu) + huy hiệu sao nổ + nhãn dán nghiêng + dải chân trang",
+  "prompt": "Wide summer promotion banner featuring exactly the soda can from image 1 splashing into ice and lemon slices on the right, bright red and white palette, sunny beach background. Headline \"COMBO MÙA HÈ\" in a bold white sans-serif with a red outline on the left. Two yellow starburst price badges: \"2 lon 25.000đ\" and \"Thùng 24 lon 260.000đ\". A tilted red sticker with \"HOT\" in white. Footer: \"Áp dụng 01-31/07/2026 tại mọi cửa hàng\" in small white text on a dark band.",
+  "texts": [
+   {
+    "text": "COMBO MÙA HÈ",
+    "role": "headline"
+   },
+   {
+    "text": "2 lon 25.000đ",
+    "role": "offer"
+   },
+   {
+    "text": "Thùng 24 lon 260.000đ",
+    "role": "offer"
+   },
+   {
+    "text": "HOT",
+    "role": "label"
+   },
+   {
+    "text": "Áp dụng 01-31/07/2026 tại mọi cửa hàng",
+    "role": "info"
+   }
+  ],
+  "ref": "bench/refs/coca_cola_can.jpg",
+  "scene_texts": [
+   "Coca-Cola"
+  ]
+ },
+ {
+  "key": "r05",
+  "level": "hard",
+  "category": "product_intro",
+  "ratio": "4:5",
+  "w": 896,
+  "h": 1120,
+  "seeds": [
+   0,
+   1
+  ],
+  "focus": "CHỮ XOAY NGHIÊNG TRÊN BAO BÌ (ảnh tham chiếu) + thông số có icon + pill",
+  "prompt": "Product introduction poster for instant coffee featuring exactly the coffee packs from image 1 next to a steaming cup of black coffee and roasted coffee beans, dark brown wooden background, warm morning light. Product name \"Cà phê hòa tan Nescafé Classic\" in bold cream white at the top. Three lines with small cream icons: coffee bean \"100% hạt cà phê chọn lọc\", clock \"Pha chỉ trong 30 giây\", cup \"Đậm đà mỗi sáng\". Price \"65.000đ / hộp\" in bold. A rounded orange pill \"Giảm 15% khi mua 3 hộp\".",
+  "texts": [
+   {
+    "text": "Cà phê hòa tan Nescafé Classic",
+    "role": "headline"
+   },
+   {
+    "text": "100% hạt cà phê chọn lọc",
+    "role": "list_item"
+   },
+   {
+    "text": "Pha chỉ trong 30 giây",
+    "role": "list_item"
+   },
+   {
+    "text": "Đậm đà mỗi sáng",
+    "role": "list_item"
+   },
+   {
+    "text": "65.000đ / hộp",
+    "role": "price"
+   },
+   {
+    "text": "Giảm 15% khi mua 3 hộp",
+    "role": "offer"
+   }
+  ],
+  "ref": "bench/refs/nescafe_classic.jpg",
+  "scene_texts": [
+   "NESCAFÉ",
+   "CLASSIC"
+  ]
+ }
+]

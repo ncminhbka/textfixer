@@ -79,18 +79,20 @@ thời gian).
 
 ## 6. Thử engine không qua giao diện
 
-```bash
-python scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ + xoá, VLM thật
-python scripts/probe.py --only p11_distill_s4    # một ca
+Mọi script chạy trên máy chủ tự gói kết quả thành các zip **độc lập, mỗi zip < 27 MB** (giải nén từng cái, không cần ghép) và
+**tự tải về** khi chạy bằng ô notebook (`%run`). Chạy từ terminal thì zip vẫn được gói, tải tay từ cây thư mục JupyterLab.
+Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": chọn cho phép.
+
+```python
+# ô notebook, thư mục làm việc = thư mục repo (%cd ~/work/<thư mục repo>)
+%run scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ + xoá, VLM thật -> probe_NN.zip
+%run scripts/probe.py --only p11_distill_s4    # một ca
+%run scripts/make_pairs.py                     # cặp nháp + bản xoá cho bộ đáp án ô (docs/SLOTS_GT.md) -> pairs_NN.zip
 ```
 
-Ra `output/probe/<key>.jpg` (nháp | ô | bản xoá | poster | lệnh) và `<key>_plan.json`. Mang kết quả về máy cá nhân, mỗi file
-dưới 27 MB:
+Biến môi trường trong notebook: `%env` từng biến, hoặc chạy `source ~/textfix_env.sh` trước khi mở JupyterLab.
 
-```bash
-cd ~/<repo>/output && tar -czf ~/probe.tar.gz --exclude='*_poster.png' probe
-cd ~ && split -b 25M -d probe.tar.gz probe.tar.gz.part
-```
+`probe.py` ra `output/probe/<key>.jpg` (nháp | ô | bản xoá | poster | lệnh), `<key>_plan.json`, `<key>_poster.png`.
 
 ## Sự cố
 
