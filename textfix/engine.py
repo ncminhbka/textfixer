@@ -75,7 +75,7 @@ class Engine:
         T["o"] = time.time() - t0
         t0 = time.time()
         self.progress("VLM thiết kế")
-        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm, product=product), M)
+        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm, product=product, base=plate), M)
         if cinfo["lines"]:
             log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
         T["vlm"] = time.time() - t0

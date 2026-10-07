@@ -313,7 +313,11 @@ poster = the BASE + your slots. Keep the model's layout: every slot stays where 
 AESTHETICS COME FIRST. When the draft and the prompt / client texts disagree, follow the draft. A clean, consistent, \
 well-fitted poster beats a complete one.
 
-SLOTS (marked on the second image: blue S#, red L#, orange I#; then 4 zoomed quarters of it):
+IMAGES: the message names each image. DRAFT = what the model drew. SLOTS = the draft with every slot marked (blue S#, red \
+L#, orange I#); ZOOM images are enlarged parts of it. BASE (when given) = the erased poster the renderer draws your slots on: \
+what will really be behind each slot (shells the eraser kept are still there; skipped slots leave this background).
+
+SLOTS:
 - S# SHELL: a card / pill / badge / band / button / panel the model drew; measured box, fill color, corner radius, and which \
 L# / I# lie inside it.
 - I# DETAIL: a small non-text element (icon, avatar, star row, check mark, bullet, logo, emoji...); measured box and color, \
@@ -410,19 +414,86 @@ PRODUCT_NOTE = ("The client uploaded a photo of their product and the image mode
                 "\"keep\", never redraw or skip them.")
 
 
-def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False) -> dict:
+VIEWS = {   # ảnh gửi designer (thử: scripts/vlm_probe.py). D nháp, S nháp đánh dấu ô, Q 4 góc phóng 2x, X bản xoá (nền dựng),
+    "A": "DSQ",    # Z vùng cắt phóng to quanh cụm ô
+    "AX": "DSQX",
+    "BX": "DSX",
+    "CX": "SXZ",
+}
+VIEW = "A"   # cấu hình dùng thật (chốt theo kết quả thử)
+
+
+def _quarters(mk) -> list[bytes]:
+    """4 góc chồng 10%, phóng 2x: đọc được ô nhỏ."""
     from PIL import Image
-    mk = marked_image(draft, M)
     W, H = mk.size
-    quarters = []
-    for (a, b) in ((0, 0), (1, 0), (0, 1), (1, 1)):   # 4 góc chồng 10%, phóng 2x: đọc được ô nhỏ
+    out = []
+    for (a, b) in ((0, 0), (1, 0), (0, 1), (1, 1)):
         x0, y0 = int(a * W * 0.45), int(b * H * 0.45)
         q = mk.crop((x0, y0, x0 + int(W * 0.55), y0 + int(H * 0.55)))
-        quarters.append(_png(q.resize((q.width * 2, q.height * 2), Image.LANCZOS)))
+        out.append(_png(q.resize((q.width * 2, q.height * 2), Image.LANCZOS)))
+    return out
+
+
+def _clusters(mk, M: dict, n_max: int = 4, side: int = 1024) -> list[bytes]:
+    """Vùng cắt quanh CỤM ô (khung ô nới 4% cạnh ngắn chạm nhau = một cụm; gộp cụm gần nhất tới <= n_max), phóng cạnh dài
+    = side: chỗ có ô được phóng, chỗ chỉ có ảnh thì không."""
+    from PIL import Image
+    W, H = mk.size
+    pad = 0.04 * min(W, H)
+    boxes = [[b["box"][0] - pad, b["box"][1] - pad, b["box"][2] + pad, b["box"][3] + pad] for b in M["L"] + M["S"] + M["I"]]
+    if not boxes:
+        return []
+    ov = lambda a, b: a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]   # noqa: E731
+    un = lambda a, b: [min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])]   # noqa: E731
+    cl = [list(b) for b in boxes]
+    merged = True
+    while merged:
+        merged = False
+        for i in range(len(cl)):
+            for j in range(i + 1, len(cl)):
+                if ov(cl[i], cl[j]):
+                    cl[i] = un(cl[i], cl.pop(j))
+                    merged = True
+                    break
+            if merged:
+                break
+    while len(cl) > n_max:   # gộp cặp làm tăng diện tích ít nhất
+        area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
+        i, j = min(((i, j) for i in range(len(cl)) for j in range(i + 1, len(cl))),
+                   key=lambda ij: area(un(cl[ij[0]], cl[ij[1]])) - area(cl[ij[0]]) - area(cl[ij[1]]))
+        cl[i] = un(cl[i], cl.pop(j))
+    out = []
+    for b in sorted(cl, key=lambda b: (b[1], b[0])):
+        b = [max(0, int(b[0])), max(0, int(b[1])), min(W, int(b[2])), min(H, int(b[3]))]
+        c = mk.crop(b)
+        z = side / max(c.size)
+        out.append(_png(c.resize((max(1, int(c.width * z)), max(1, int(c.height * z))), Image.LANCZOS)))
+    return out
+
+
+def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
+         view: str | None = None, meta: dict | None = None) -> dict:
+    """base: bản xoá đã dọn (nền dựng) cho các cấu hình có X. meta: nhận số token / thời gian (llm.json_call)."""
+    mk = marked_image(draft, M)
+    W, H = mk.size
+    v = VIEWS[view or VIEW]
+    imgs = []
+    for c in v:
+        if c == "D":
+            imgs += ["DRAFT:", _png(draft)]
+        elif c == "S":
+            imgs += ["SLOTS (marked):", _png(mk)]
+        elif c == "Q":
+            imgs += ["ZOOM (4 quarters of SLOTS, 2x):", *_quarters(mk)]
+        elif c == "X" and base is not None:
+            imgs += ["BASE (erased poster, your slots are drawn on it):", _png(base)]
+        elif c == "Z":
+            imgs += ["ZOOM (slot clusters of SLOTS, enlarged):", *_clusters(mk, M)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}")
-    return _to_marks(call(_system(SYSTEM), [user, "DRAFT:", _png(draft), "SLOTS (marked):", _png(mk), "ZOOM (4 quarters, marked):",
-                                            *quarters]))
+    args = (_system(SYSTEM), [user, *imgs]) + ((meta,) if meta is not None else ())
+    return _to_marks(call(*args))
 
 
 def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
@@ -440,7 +511,7 @@ def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
 
 
 def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], prompt: str, texts: list[dict], call,
-           product: bool = False) -> dict:
+           product: bool = False, meta: dict | None = None) -> dict:
     """Vòng sửa (chỉ khi render.check báo lỗi): một lượt VLM, gửi các lệnh / ô lỗi + ảnh phóng vùng lỗi (bản dựng có khung lệnh,
     nháp đánh dấu) -> P mới: vá đúng các lệnh đó, thêm lệnh cho ô chưa quyết; các lệnh khác giữ nguyên."""
     from PIL import Image, ImageDraw
@@ -475,7 +546,7 @@ def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     ops = [by_id[i] for i in dict.fromkeys(ids)]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nInvolved ops:\n{json.dumps(ops, ensure_ascii=False)}")
-    out = call(_system(SYSTEM) + "\n\n" + REPAIR, [user, *parts])
+    out = call(*((_system(SYSTEM) + "\n\n" + REPAIR, [user, *parts]) + ((meta,) if meta is not None else ())))
     new, patches = [], {p.get("id"): p for p in out.get("patches", []) if p.get("id")}
     for op in P["ops"]:
         p = patches.pop(op["id"], None)

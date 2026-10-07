@@ -151,6 +151,9 @@ def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
 RENDER_JS = r"""
 async (o) => {
   const c = document.getElementById('c');
+  // nạp HẾT font khai báo trước khi đo: fonts.ready xong ngay khi chưa có chữ nào dùng font (chưa bắt đầu tải) -> lần dựng đầu
+  // của trang đo bằng font dự phòng (cỡ / tràn sai), các lần sau đúng nhờ bộ nhớ đệm
+  await Promise.all([...document.fonts].map(f => f.load().catch(() => null)));
   await document.fonts.ready;
   const out = [];
   for (const e of o.els) {
