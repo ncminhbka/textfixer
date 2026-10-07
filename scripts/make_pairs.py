@@ -98,7 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     if not a.no_ship:
         files = [(meta_f, "pairs.json")] + [(p, p.name) for p in sorted(a.out.glob("*_draft.png")) + sorted(a.out.glob("*_plate.png"))
                                             if p.name.rsplit("_", 1)[0] in meta]
-        ship.offer(ship.pack(files, a.out.parent / "pairs_zip", "pairs", int(a.zip_mb * 2**20) if a.zip_mb else None))
+        ship.offer(ship.pack(files, a.out.parent / "pairs_zip", "pairs", int(a.zip_mb * 2**20) if a.zip_mb else None,
+                               group=lambda arc: arc.rsplit("_", 1)[0]))   # <key>_draft.png + <key>_plate.png chung một zip
     return 0
 
 

@@ -22,23 +22,27 @@ LIMIT = int(float(os.environ.get("TEXTFIX_ZIP_MB", "22")) * 1024 * 1024)
 HEADROOM = 256 * 1024   # chừa cho mục lục zip / tên tệp
 
 
-def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int | None = None) -> list[Path]:
+def pack(files: list[tuple[Path, str]], out_dir: Path, name: str, limit: int | None = None, group=None) -> list[Path]:
     """Xếp tệp vào các zip độc lập < limit (xếp tham lam theo cỡ giảm dần vào zip đầu tiên còn chỗ). Ảnh đã nén (png / jpg) lưu
-    thẳng, còn lại deflate. Tệp đơn lẻ to hơn limit -> lỗi (cắt nhỏ tệp trước khi gói)."""
+    thẳng, còn lại deflate. group(tên trong zip) -> khoá: các tệp cùng khoá luôn nằm CHUNG một zip (vd. nháp + bản xoá của một
+    ảnh: tải thiếu zip nào cũng chỉ mất trọn vài cặp, không còn tệp lẻ). Nhóm to hơn limit -> lỗi."""
     limit = limit or LIMIT
     cap = limit - HEADROOM
-    items = sorted(((Path(p), arc, Path(p).stat().st_size) for p, arc in files), key=lambda t: -t[2])
-    big = [str(p) for p, _, s in items if s > cap]
+    groups: dict = {}
+    for p, arc in files:
+        groups.setdefault(group(arc) if group else arc, []).append((Path(p), arc))
+    items = sorted(((m, sum(p.stat().st_size for p, _ in m)) for m in groups.values()), key=lambda t: -t[1])
+    big = [[a for _, a in m] for m, s in items if s > cap]
     if big:
-        raise ValueError(f"tệp lớn hơn {cap / 2**20:.1f} MB, không gói được: {big}")
+        raise ValueError(f"nhóm tệp lớn hơn {cap / 2**20:.1f} MB, không gói được: {big}")
     bins: list[list] = []
-    for p, arc, s in items:
+    for m, s in items:
         b = next((b for b in bins if b[0] + s <= cap), None)
         if b is None:
             b = [0, []]
             bins.append(b)
         b[0] += s
-        b[1].append((p, arc))
+        b[1].extend(m)
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob(f"{name}_*.zip"):
         old.unlink()
