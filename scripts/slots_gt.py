@@ -44,9 +44,11 @@ def _load(key: str, pairs: Path):
 
 
 def predict(draft, plate) -> list[dict]:
-    """Ô của bộ đo hiện tại (slots.build) -> [{cls, box, id}]. Dòng nghiêng: khung thẳng ôm ngoài."""
+    """Ô của bộ đo hiện tại, ĐÚNG như pipeline: dọn chữ sót (cleanup, không FLUX: inpaint) rồi slots.build -> [{cls, box, id}].
+    Dòng nghiêng: khung thẳng ôm ngoài."""
+    from textfix.cleanup import clean
     from textfix.slots import build
-    M = build(draft, plate)
+    M = build(draft, clean(draft, plate)[0])
     return [{"cls": c, "box": [round(float(v), 1) for v in m["box"]], "id": m["id"]} for c in CLASSES for m in M[c]]
 
 
@@ -70,7 +72,7 @@ def prefill(a) -> int:
                 continue
         t0 = time.time()
         d, p = _load(k, a.pairs)
-        boxes = [{"cls": b["cls"], "box": b["box"]} for b in predict(d, p)]
+        boxes = [{"cls": b["cls"], "box": b["box"], "id": b["id"]} for b in predict(d, p)]
         f.write_text(json.dumps({"key": k, "size": [d.shape[1], d.shape[0]], "status": "prefill", "boxes": boxes},
                                 ensure_ascii=False, indent=1), encoding="utf-8")
         n = {c: sum(b["cls"] == c for b in boxes) for c in CLASSES}

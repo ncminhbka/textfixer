@@ -70,6 +70,12 @@ Người duyệt mở công cụ, sửa chỗ sai, bấm Enter. Hướng dẫn d
 
 ## 4. Luật theo lớp
 
+Đáp án = **cái designer cần nhận**, so với bản xoá **đã dọn chữ sót** (pipeline: xoá -> dọn chữ sót -> tách ô):
+- **L**: mọi dòng chữ poster (sau bước dọn, chữ poster đều đã bị xoá, phải vẽ lại).
+- **S / I**: chỉ vỏ / chi tiết **đã mất khỏi bản xoá** (cần vẽ lại). Vỏ / icon / avatar **còn nguyên trong bản xoá thì KHÔNG
+  gán** (bản xoá thường giữ thẻ, badge, vòng tròn số: designer vẽ chữ lên chúng; tạo ô S sẽ vẽ chồng vỏ thứ hai).
+- **P**: chữ thuộc cảnh / in trên sản phẩm (giữ nguyên).
+
 Chỉ gán thứ thuộc **lớp phủ** (thứ một designer đặt lên ảnh). Phép thử: giữ `Space`, thứ đó **biến mất** trong bản xoá → lớp
 phủ. **Còn nguyên** → thuộc ảnh: không gán, trừ chữ thì gán P. Bản xoá đôi khi xoá nhầm cả nhãn sản phẩm: lúc đó dựa vào ý
 nghĩa (chữ nằm **trên vật** → P).
