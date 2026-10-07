@@ -10,6 +10,7 @@ form / prompt
   -> LLM: prompt FLUX.2 (theo hướng dẫn nâng prompt của BFL) + câu của khách          textfix/brief.py
   -> FLUX.2-klein vẽ nháp                                                            textfix/flux.py
   -> FLUX.2-klein xoá lớp phủ (lời dặn ngắn: "Remove all text from this image...")    textfix/flux.py
+  -> dọn chữ sót: OCR bản xoá, xoá nét (inpaint / FLUX vùng cắt)                       textfix/cleanup.py
   -> nháp - bản xoá = lớp phủ -> các Ô: S# vỏ, I# chi tiết nhỏ, L# dòng chữ           textfix/overlay.py, slots.py
   -> VLM designer: quyết mỗi ô là gì, điền nội dung + CSS (không đưa toạ độ)          textfix/slots.py
   -> dựng HTML đúng khung từng ô trên bản xoá (Chromium), kiểm lỗi, một vòng sửa      textfix/render.py
@@ -40,6 +41,7 @@ Chạy trên máy chủ bằng ô notebook (`%run scripts/...`): kết quả t�
 | `textfix/engine.py` | Nối toàn bộ luồng: `Engine.brief`, `make` (vẽ + sửa), `fix` (sửa nháp có sẵn) |
 | `textfix/brief.py` | LLM đầu luồng: prompt FLUX + câu khách, code giữ cam kết không bịa chữ |
 | `textfix/flux.py` | FLUX.2-klein: vẽ nháp, xoá lớp phủ, căn bản xoá theo nháp |
+| `textfix/cleanup.py` | Dọn chữ bản xoá còn sót (OCR bản xoá, xoá nét: inpaint / FLUX vùng cắt) |
 | `textfix/overlay.py` | Bản đồ lớp phủ: tách vỏ (S#) và chi tiết nhỏ (I#), đo màu, bo góc |
 | `textfix/slots.py` | Ô (dòng chữ nắn theo lớp phủ), lời dặn designer, gọi VLM, vòng sửa, nền |
 | `textfix/render.py` | Dựng HTML đúng khung ô (thẻ tiện ích icon / sao / font), kiểm lỗi |

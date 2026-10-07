@@ -86,7 +86,7 @@ def main() -> int:
                     draft = np.asarray(Image.open(a.data / f"{k}_draft.png").convert("RGB"))
                     pf = a.data / f"{k}_{a.plate_suffix}.png"
                     plate = np.asarray(Image.open(pf).convert("RGB").resize((draft.shape[1], draft.shape[0]))) if pf.exists() else None
-                    r = E.fix(draft, B, seed, plate)
+                    r = E.fix(draft, B, seed, plate, product=bool(j.get("ref")))
                 else:
                     r = E.make(B, j["w"], j["h"], seed, product)
             except Exception as e:

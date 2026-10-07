@@ -3,7 +3,7 @@
   with Engine(flux) as E:                                    # flux = flux.Flux("distill").load() (None: chỉ fix() nháp có sẵn)
       B = E.brief(prompt=..., form=..., design=...)          # LLM: prompt FLUX + câu khách
       r = E.make(B, W, H, seed)                              # FLUX vẽ nháp -> fix()
-      r = E.fix(draft, B, seed, plate=None)                  # xoá (FLUX) -> ô -> VLM điền ô -> dựng -> kiểm -> một vòng sửa
+      r = E.fix(draft, B, seed, plate=None)                  # xoá (FLUX) -> dọn chữ sót -> ô -> VLM điền ô -> dựng -> kiểm -> sửa
   r: {draft, plate, poster, steps (ảnh 4 cột), plan (JSON: ô, lệnh, lỗi, nhật ký, câu thiếu), timing}
 """
 
@@ -50,25 +50,34 @@ class Engine:
         t0 = time.time()
         draft = self.flux.generate(B["prompt_en"], W, H, seed, refs=[product] if product is not None else None)
         t_draft = round(time.time() - t0, 1)
-        r = self.fix(draft, B, seed)
+        r = self.fix(draft, B, seed, product=product is not None)
         r["timing"] = {"ve_nhap": t_draft, **r["timing"]}
         return r
 
-    def fix(self, draft: np.ndarray, B: dict, seed: int = 0, plate: np.ndarray | None = None) -> dict:
-        from . import render, slots
-        from .flux import erase
+    def fix(self, draft: np.ndarray, B: dict, seed: int = 0, plate: np.ndarray | None = None, product: bool = False) -> dict:
+        """product: người dùng tải ảnh sản phẩm (chữ / logo in trên sản phẩm trong nháp -> designer "keep")."""
+        from . import cleanup, render, slots
+        from .flux import ERASE_PROMPT, erase
         T, t0 = {}, time.time()
         if plate is None:
             self.progress("FLUX xoá lớp phủ")
             plate = erase(self.flux, draft, seed)
             T["xoa"] = time.time() - t0
             t0 = time.time()
+        # bước xoá ngẫu nhiên: dọn chữ còn sót (OCR bản xoá) TRƯỚC khi tách ô -> chỗ dọn thành lớp phủ, thành ô như mọi chữ khác
+        self.progress("dọn chữ sót")
+        fe = (lambda im: self.flux.edit(im, ERASE_PROMPT, seed)) if self.flux is not None else None   # noqa: E731
+        plate, cinfo = cleanup.clean(draft, plate, erase=fe)
+        T["don"] = time.time() - t0
+        t0 = time.time()
         self.progress("đo ô (OCR + lớp phủ)")
         M = slots.build(draft, plate)
         T["o"] = time.time() - t0
         t0 = time.time()
         self.progress("VLM thiết kế")
-        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm), M)
+        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm, product=product), M)
+        if cinfo["lines"]:
+            log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
         T["vlm"] = time.time() - t0
         t0 = time.time()
         self.progress("dựng + kiểm")
@@ -80,7 +89,8 @@ class Engine:
             t0 = time.time()
             self.progress("VLM sửa lỗi")
             try:
-                P2, vlog2 = slots.validate(slots.repair(draft, poster, M, P, errs, B["prompt_en"], B["texts"], self.vlm), M)
+                P2, vlog2 = slots.validate(slots.repair(draft, poster, M, P, errs, B["prompt_en"], B["texts"], self.vlm,
+                                                        product=product), M)
                 poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
                 errs2 = render.check(P2, M, res2)
                 log += ["-- vòng sửa lỗi --", f"VLM: {P2.get('repair_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
@@ -96,7 +106,7 @@ class Engine:
         tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
         missing = [B["texts"][i]["text"] for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
         plan = {"style": P.get("style"), "ops": P["ops"], "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
-                "slots": slots.public(M)}
+                "slots": slots.public(M), "cleanup": cinfo}
         steps = _row([draft, slots.marked_image(draft, M), plate, poster])
         return {"draft": draft, "plate": plate, "poster": poster, "steps": steps, "plan": plan,
                 "timing": {k: round(v, 1) for k, v in T.items()}}

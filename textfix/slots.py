@@ -157,7 +157,8 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
                     "below" if cy > y1 else "on"
                 best = (d, l["id"], side)
         c["near"] = f"{best[2]} {best[1]}" if best and best[0] <= 3 * max(8.0, c["box"][3] - c["box"][1]) else None
-    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}}
+    # mask: lớp phủ (nháp - bản xoá đã dọn), cho "keep" dán lại trọn mảng bị xoá (không ghi JSON)
+    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"]}
 
 
 def public(M: dict) -> dict:
@@ -211,13 +212,15 @@ the measured color, the shell it is in.
 
 FOR EACH SLOT, ONE op (a text op may take several consecutive lines of one text block):
 - S#: kind "shape", slots ["S1"], box_style = CSS for the shell matching the draft (start from the measured fill and radius; \
-add border / shadow / gradient / transparency if the draft shows it), html "". Or kind "skip" if the shell is junk.
+add border / shadow / gradient / transparency if the draft shows it), html "". Or kind "skip" if the shell is junk, or kind \
+"keep" if it is part of the picture (a graphic printed on a product, package or object: its original pixels are restored).
 - I#: kind "icon", slots ["I3"], html = ONE helper tag without a size (it fills the slot): <i-icon name="<lucide name>" \
 color="#hex"></i-icon>; a person avatar -> <i-icon name="circle-user" color="#hex"></i-icon>; a star row -> <i-stars n="5" \
 fill="#f5b301" empty="#d9d9d9"></i-stars>. Pick the icon from what the model drew and what the nearby text means. Or kind \
-"skip" for junk, duplicates, or a detail that belongs to the picture (a label on an object, a sign in the scene).
+"skip" for junk or duplicates, or kind "keep" for a detail that belongs to the picture (a logo or graphic printed on a product, \
+package or object, a sign in the scene: its original pixels are restored).
 - L#: kind "text", slots ["L5"] or ["L5","L6"], html = the text. Or kind "keep" for text printed on a product, package, screen \
-or object in the photo (its original pixels are restored), or kind "skip" for junk / duplicates.
+or object in the photo (its original pixels are restored, never redraw such text), or kind "skip" for junk / duplicates.
 - Every slot id appears in exactly ONE op -- never leave a slot out (use "skip" to drop it).
 
 TEXT
@@ -291,7 +294,12 @@ def _texts(texts: list[dict]) -> str:
     return "\n".join(f"T{i} ({t.get('role', '')}): {t['text']}" for i, t in enumerate(texts))
 
 
-def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call) -> dict:
+PRODUCT_NOTE = ("The client uploaded a photo of their product and the image model copied it into the draft. Text, logos and "
+                "graphics printed on that product (label, package, screen) are part of the photo: give every slot on them kind "
+                "\"keep\", never redraw or skip them.")
+
+
+def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False) -> dict:
     from PIL import Image
     mk = marked_image(draft, M)
     W, H = mk.size
@@ -301,7 +309,7 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call) -> di
         q = mk.crop((x0, y0, x0 + int(W * 0.55), y0 + int(H * 0.55)))
         quarters.append(_png(q.resize((q.width * 2, q.height * 2), Image.LANCZOS)))
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\nPoster size: {W}x{H}px.\n\n"
-            f"{describe(M)}")
+            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}")
     return _to_marks(call(_system(SYSTEM), [user, "DRAFT:", _png(draft), "SLOTS (marked):", _png(mk), "ZOOM (4 quarters, marked):",
                                             *quarters]))
 
@@ -320,7 +328,8 @@ def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
     return {**P, "ops": ops}, log
 
 
-def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], prompt: str, texts: list[dict], call) -> dict:
+def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], prompt: str, texts: list[dict], call,
+           product: bool = False) -> dict:
     """Vòng sửa (chỉ khi render.check báo lỗi): một lượt VLM, gửi các lệnh / ô lỗi + ảnh phóng vùng lỗi (bản dựng có khung lệnh,
     nháp đánh dấu) -> P mới: vá đúng các lệnh đó, thêm lệnh cho ô chưa quyết; các lệnh khác giữ nguyên."""
     from PIL import Image, ImageDraw
@@ -353,8 +362,8 @@ def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
         parts += ["PROOF crop:", _png(pr.crop(cb).resize(sz, Image.LANCZOS)), "MARKED draft crop:", _png(mk.crop(cb).resize(sz, Image.LANCZOS))]
         n_img += 1
     ops = [by_id[i] for i in dict.fromkeys(ids)]
-    user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n{describe(M)}\n\n"
-            f"Involved ops:\n{json.dumps(ops, ensure_ascii=False)}")
+    user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
+            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nInvolved ops:\n{json.dumps(ops, ensure_ascii=False)}")
     out = call(_system(SYSTEM) + "\n\n" + REPAIR, [user, *parts])
     new, patches = [], {p.get("id"): p for p in out.get("patches", []) if p.get("id")}
     for op in P["ops"]:
@@ -374,19 +383,33 @@ def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
 
 # ---------------------------------------------------------------------------------------------------- nền
 def base_image(draft: np.ndarray, plate: np.ndarray, M: dict, P: dict) -> np.ndarray:
-    """Bản xoá + DÁN LẠI pixel nháp ở các dòng "keep" (chữ in trên sản phẩm / màn hình: bản xoá đã xoá cả chúng)."""
+    """Bản xoá + DÁN LẠI pixel nháp ở các ô "keep" (chữ / logo / hình in trên sản phẩm, màn hình: bản xoá đã xoá cả chúng).
+    Vùng dán = khung ô nới 0.25 cao + TRỌN các mảng lớp phủ chạm khung (vòng con dấu, phần logo ngoài khung dòng), trong giới
+    hạn khung nới 1 cao ô mỗi phía (mảng lớp phủ to chạy xa -- dải, thẻ -- không bị kéo theo)."""
     import cv2
     H, W = draft.shape[:2]
     m = np.zeros((H, W), np.uint8)
+    ov = M.get("mask")
+    cc = None
+    if ov is not None:
+        _, cc = cv2.connectedComponents(cv2.morphologyEx(ov.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)), connectivity=8)
     for op in P.get("ops", []):
         if op.get("kind") != "keep":
             continue
         for i in op.get("marks") or []:
-            if not i.startswith("L") or i not in M["by"]:
+            if i not in M["by"]:
                 continue
             x0, y0, x1, y1 = M["by"][i]["box"]
-            p = 0.25 * (y1 - y0)
+            h = y1 - y0
+            p = 0.25 * h
             m[int(max(0, y0 - p)):int(min(H, y1 + p)), int(max(0, x0 - p)):int(min(W, x1 + p))] = 1
+            if cc is not None:
+                X0, Y0, X1, Y1 = int(max(0, x0 - h)), int(max(0, y0 - h)), int(min(W, x1 + h)), int(min(H, y1 + h))
+                ids = np.unique(cc[int(max(0, y0)):int(min(H, y1)), int(max(0, x0)):int(min(W, x1))])
+                ids = ids[ids > 0]
+                if len(ids):
+                    sel = np.isin(cc[Y0:Y1, X0:X1], ids)
+                    m[Y0:Y1, X0:X1] |= cv2.dilate(sel.astype(np.uint8), np.ones((5, 5), np.uint8))
     if not m.any():
         return plate.copy()
     a = cv2.GaussianBlur(m.astype(np.float32), (0, 0), 2.0)[..., None]

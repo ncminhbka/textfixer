@@ -19,11 +19,26 @@ nối câu chưa có trong ngoặc kép của `prompt_en`, bỏ tỉ lệ / đ�
 
 ### 2. Nháp và bản xoá (`flux.py`)
 
-Nháp: FLUX.2-klein distill (4 bước). Bản xoá: FLUX.2-klein sửa ảnh, nháp làm ảnh tham chiếu, lời dặn **ngắn, không nhắc tên vật**:
-`Remove all text from this image. Keep everything else exactly the same.` Lời dặn dài kể "sản phẩm, người, thẻ, badge…" làm model
-distill vẽ thêm đúng thứ được nhắc (thử 07/10: thiệp cưới hiện sản phẩm lạ, tờ tuyển dụng hiện người). Lời dặn ngắn trên 12 nháp ×
-2 seed: phần ảnh ngoài chữ đổi ~0%; bản xoá bỏ toàn bộ lớp phủ (chữ, thẻ, pill, dải, icon, avatar, sao), giữ ảnh. Bản xoá được
-căn theo nháp (ECC affine).
+Nháp: FLUX.2-klein distill (4 bước); ảnh sản phẩm người dùng tải lên làm ảnh tham chiếu (FLUX giữ sản phẩm và chữ in trên đó rất
+sát). Bản xoá: FLUX.2-klein sửa ảnh, nháp làm ảnh tham chiếu, lời dặn **ngắn, không nhắc tên vật**:
+`Remove all text from this image. Keep everything else exactly the same.` Bản xoá được căn theo nháp (ECC affine).
+
+**Bước xoá ngẫu nhiên** (đo 36 cặp `bench/prompts_gt.json`, 07/10): phần ảnh giữ gần như nguyên; nhưng
+- ~8% dòng chữ còn nguyên (khó: 11%): chữ trong pill / badge màu, logo chữ, dòng liên hệ, hàng sao; đôi khi mẩu dấu ("^");
+- vỏ (thẻ, badge, vòng tròn số, pill) **thường được giữ**, đôi khi bị xoá cả vỏ, không nhất quán giữa hai vỏ giống nhau;
+- chữ in trên sản phẩm (từ ảnh tham chiếu) bị xoá ở 4/5 sản phẩm thử.
+
+Thử 6 lời dặn khác (kể thêm nút / badge / icon / sao / logo, "giữ chữ trên sản phẩm", xoá hai lượt): không cái nào tốt hơn lời
+dặn ngắn (lời dặn kể tên vật làm bản distill vẽ thêm / xoá sai). **Chốt lời dặn ngắn, luôn hậu xử lý** (bước 2b, 4).
+
+### 2b. Dọn chữ sót (`cleanup.py`)
+
+OCR bản xoá; dòng trùng vị trí một dòng của nháp = chữ chưa xoá. Xoá đúng các điểm **nét** (màu có trong lõi dòng, hiếm ở vành
+sát dòng: chữ trắng trên huy hiệu đỏ, sao vàng trên thẻ trắng), không xoá cả khung dòng (khung nới tràn ra mép vỏ nhỏ). Nền quanh
+nét phẳng / chuyển màu đều (pill, thẻ, badge) -> inpaint; nền có vân / ảnh -> FLUX xoá lại **vùng cắt** quanh các dòng đó (lời
+dặn ngắn, phóng cạnh dài 768), dán về đúng vùng nét, mép làm mờ. Làm **trước** khi tách ô: chỗ vừa dọn thành lớp phủ, thành ô như
+mọi chữ khác (hàng sao còn sót -> ô I -> `<i-stars>`). Chấp nhận: mẩu dấu lẻ OCR không đọc thành dòng, icon méo còn trong bản xoá.
+36 cặp: 30 dòng sót -> 0 (OCR).
 
 ### 3. Ô (`overlay.py`, `slots.py`)
 
@@ -49,6 +64,10 @@ lệnh:
 | S# | `shape` + CSS vỏ giống nháp (từ màu / bo góc đo được), hoặc `skip` |
 | I# | `icon`: một thẻ `<i-icon name>` (Lucide, 1544 tên) / avatar `circle-user` / `<i-stars n>`, lấp đúng ô; hoặc `skip` (rác, chi tiết thuộc cảnh) |
 | L# | `text` (được gộp các dòng liền nhau một khối), `keep` (chữ in trên sản phẩm / màn hình: dán lại pixel nháp), `skip` |
+| mọi ô | `keep`: thứ thuộc ảnh (chữ / logo / hình in trên sản phẩm, biển trong cảnh) bị bản xoá xoá nhầm -> dán lại pixel NHÁP: khung ô + trọn các mảng lớp phủ chạm khung (vòng con dấu, phần logo ngoài dòng) |
+
+Người dùng tải ảnh sản phẩm: lời nhắn designer nói rõ chữ / logo trên sản phẩm là `keep`, không vẽ lại. Chữ sản phẩm lấy từ
+**nháp** (không dán ảnh tham chiếu: sản phẩm trong nháp đã được vẽ lại); nháp vẽ sai thì chấp nhận hạn chế model.
 
 Kèm `style` (font tiêu đề, font thân trong bộ OFL), `missing` (câu khách không vẽ / bị bỏ).
 
@@ -66,6 +85,6 @@ dưới 70% (nhồi quá nhiều chữ). Có lỗi: **một** vòng VLM chỉ v�
 - Vỏ **nửa trong suốt** trên nền gần cùng màu chênh quá ít, không thành S#: chữ trong đó vẫn được vẽ, nhưng thiếu vỏ; chữ sáng có
   thể chìm trên nền sáng (chưa có bước kiểm tương phản).
 - Vỏ dính liền vỏ khác (thẻ + pill trong thẻ) thành một mảng không gọn có thể không được nhận.
-- Bản xoá xoá cả chữ / nhãn nhỏ thuộc cảnh (nhãn trên đồ vật): hiện thành I#, designer nên `skip`.
+- Bản xoá xoá cả chữ / nhãn thuộc cảnh và trên sản phẩm: chỉ cứu được qua `keep` của designer (OCR phải bắt được dòng).
 - Dòng OCR không bắt được thì không thành ô (chưa tách dòng từ lớp phủ còn thừa).
 - Chưa có mã QR.

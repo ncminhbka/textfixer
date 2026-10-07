@@ -40,8 +40,27 @@ def _cover(a, b) -> float:
     return max(0.0, w) * max(0.0, h) / max(1e-6, (a[2] - a[0]) * (a[3] - a[1]))
 
 
+_CACHE: dict = {}   # nội dung ảnh -> dòng (dọn chữ sót và tách ô cùng đọc nháp); giữ vài ảnh gần nhất
+
+
 def read_lines(img: np.ndarray | str, multi: bool = True) -> list[dict]:
     """Dòng chữ ở cỡ gốc + (multi) dòng chỉ dò được ở ảnh thu nhỏ MULTI_SCALE, không chồng dòng đã có (khung chồng < 30% cả hai phía)."""
+    import copy
+    import hashlib
+    key = None
+    if isinstance(img, np.ndarray):
+        key = (img.shape, multi, hashlib.md5(np.ascontiguousarray(img).tobytes()).hexdigest())
+        if key in _CACHE:
+            return copy.deepcopy(_CACHE[key])
+    out = _read(img, multi)
+    if key is not None:
+        if len(_CACHE) >= 8:
+            _CACHE.pop(next(iter(_CACHE)))
+        _CACHE[key] = copy.deepcopy(out)
+    return out
+
+
+def _read(img: np.ndarray | str, multi: bool) -> list[dict]:
     out = _once(img)
     if not multi or isinstance(img, str) or min(img.shape[:2]) < MULTI_MIN:
         return out
