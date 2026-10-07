@@ -10,8 +10,8 @@
   python scripts/slots_gt.py eval --vs base     # ... rồi so lần sau với mốc
 
 Tệp đáp án: {"key", "size": [W, H], "status": "prefill" | "editing" | "done", "boxes": [{"cls": "L|S|I|P", "box": [x0,y0,x1,y1]}]}
-Khớp: theo từng lớp, IoU lớn nhất trước, IoU >= 0.5. Dòng L dự đoán khớp một khung P (chữ in trên sản phẩm / vật trong ảnh) tính
-riêng ("L trúng P"), không tính là L sai.
+Khớp: theo từng lớp, IoU lớn nhất trước, IoU >= 0.5. Dòng L dự đoán không khớp L nào mà nằm >= 70% trong một khung P (chữ in
+trên sản phẩm / vật trong ảnh, một khung bao cả mảng) tính riêng ("L trúng P"), không tính là L sai.
 """
 
 from __future__ import annotations
@@ -43,12 +43,40 @@ def _load(key: str, pairs: Path):
     return d, p
 
 
-def predict(draft, plate) -> list[dict]:
+CACHE = ROOT / "output" / "slots_eval" / "cache"
+
+
+def _cached(name: str, src: list[str], make):
+    """Nhớ kết quả trên đĩa theo nội dung mã nguồn các tệp src (đổi mã -> tính lại). Chỉ để chấm nhanh khi chỉnh bộ đo."""
+    import hashlib
+    import pickle
+    h = hashlib.md5(b"".join((ROOT / f).read_bytes() for f in src)).hexdigest()[:10]
+    f = CACHE / f"{name}.{h}.pkl"
+    if f.exists():
+        return pickle.loads(f.read_bytes())
+    v = make()
+    CACHE.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(pickle.dumps(v))
+    return v
+
+
+def predict(draft, plate, key: str | None = None) -> list[dict]:
     """Ô của bộ đo hiện tại, ĐÚNG như pipeline: dọn chữ sót (cleanup, không FLUX: inpaint) rồi slots.build -> [{cls, box, id}].
-    Dòng nghiêng: khung thẳng ôm ngoài."""
+    Dòng nghiêng: khung thẳng ôm ngoài. key: nhớ bản đã dọn + OCR nháp (theo mã cleanup / ocr) để chấm nhanh."""
+    from textfix import ocr
     from textfix.cleanup import clean
     from textfix.slots import build
-    M = build(draft, clean(draft, plate)[0])
+    if key:
+        cleaned = _cached(f"{key}_clean", ["textfix/cleanup.py", "textfix/ocr.py", "textfix/textmask.py"],
+                          lambda: clean(draft, plate)[0])
+        lines = _cached(f"{key}_ocr", ["textfix/ocr.py"], lambda: ocr.read_lines(draft))
+        import copy
+        import hashlib
+        import numpy as np
+        ocr._CACHE[(draft.shape, True, hashlib.md5(np.ascontiguousarray(draft).tobytes()).hexdigest())] = copy.deepcopy(lines)
+    else:
+        cleaned = clean(draft, plate)[0]
+    M = build(draft, cleaned)
     return [{"cls": c, "box": [round(float(v), 1) for v in m["box"]], "id": m["id"]} for c in CLASSES for m in M[c]]
 
 
@@ -89,6 +117,12 @@ def iou(a, b) -> float:
     return i / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i)
 
 
+def _inside(a, b) -> float:
+    """phần diện tích a nằm trong b"""
+    w, h = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
+    return max(0.0, w) * max(0.0, h) / max(1e-6, (a[2] - a[0]) * (a[3] - a[1]))
+
+
 def match(pred: list, gt: list, thr: float = IOU) -> list[tuple[int, int, float]]:
     """Khớp tham lam IoU lớn nhất trước -> [(chỉ số pred, chỉ số gt, iou)]."""
     cand = sorted(((iou(p["box"], g["box"]), i, j) for i, p in enumerate(pred) for j, g in enumerate(gt)), reverse=True)
@@ -114,9 +148,8 @@ def score(pred: list, gt: list) -> dict:
         m = match([pred[i] for i in pi], [gt[j] for j in gi])
         mp, mg = {pi[i] for i, _, _ in m}, {gi[j] for _, j, _ in m}
         on_p = set()
-        if c == "L" and P:   # dòng L chưa khớp L nào mà trúng chữ cảnh P
-            rest = [i for i in pi if i not in mp]
-            on_p = {rest[i] for i, _, _ in match([pred[i] for i in rest], P, 0.3)}
+        if c == "L" and P:   # dòng L chưa khớp L nào mà nằm >= 70% trong một khung chữ cảnh P (P bao cả mảng chữ trên vật)
+            on_p = {i for i in pi if i not in mp and any(_inside(pred[i]["box"], q["box"]) >= 0.7 for q in P)}
         res[c] = {"tp": len(m), "fp": len(pi) - len(m) - len(on_p), "fn": len(gi) - len(m), "iou_sum": sum(v for _, _, v in m),
                   **({"on_p": len(on_p), "p": len(P)} if c == "L" else {})}
         for i in pi:
@@ -158,10 +191,13 @@ def draw(draft, pred, gt, tags, path: Path) -> None:
 
 def evaluate(a) -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    files = sorted(GT.glob("*.json"))
+    files = sorted(f for f in GT.glob("*.json") if f.name != "split.json")
     docs = [json.loads(f.read_text(encoding="utf-8")) for f in files]
     docs = [g for g in docs if (a.all or g.get("status") == "done") and (not a.only or g["key"] in a.only.split(","))]
     docs = [g for g in docs if (a.pairs / f"{g['key']}_draft.png").exists()]
+    if a.split != "all":   # chống overfit: chỉnh trên dev, test khoá (bench/slots_gt/split.json, chia theo prompt)
+        test = set(json.loads((GT / "split.json").read_text(encoding="utf-8"))["test"])
+        docs = [g for g in docs if (g["key"].split("_")[0] in test) == (a.split == "test")]
     if not docs:
         print("chưa có tệp đáp án 'done' nào có ảnh (sửa bằng tools/annotate.html rồi đánh dấu xong; hoặc --all để thử)")
         return 1
@@ -170,13 +206,20 @@ def evaluate(a) -> int:
     t0 = time.time()
     for g in docs:
         d, p = _load(g["key"], a.pairs)
-        pred = predict(d, p)
+        pred = predict(d, p, g["key"])
         s = score(pred, g["boxes"])
         per[g["key"]] = s["by_cls"]
         for c in CLASSES:
             for k, v in s["by_cls"][c].items():
                 tot[c][k] += v
         draw(d, pred, g["boxes"], s["tags"], OUT / f"{g['key']}.jpg")
+        if a.dump:
+            for i, t in s["tags"]["pred"].items():
+                if t == "fp":
+                    print(f"    sai   {pred[i]['id']:<4} {[int(v) for v in pred[i]['box']]}")
+            for j, t in s["tags"]["gt"].items():
+                if t == "fn":
+                    print(f"    thiếu {g['boxes'][j]['cls']:<4} {[int(v) for v in g['boxes'][j]['box']]}")
         line = "  ".join(f"{c} {r['tp']}/{r['tp'] + r['fn']} sai {r['fp']}" for c, r in s["by_cls"].items())
         print(f"{g['key']:<14} {line}" + (f"  L trúng P {s['by_cls']['L']['on_p']}" if s["by_cls"]["L"].get("on_p") else ""))
     print(f"\n{len(docs)} ảnh, {time.time() - t0:.0f}s. IoU >= {IOU}")
@@ -208,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--all", action="store_true", help="eval: chấm cả tệp chưa 'done'")
     ap.add_argument("--save", default="", help="eval: lưu kết quả làm mốc với tên này")
     ap.add_argument("--vs", default="", help="eval: so với mốc đã lưu")
+    ap.add_argument("--split", default="dev", choices=["dev", "test", "all"], help="eval: dev (mặc định, để chỉnh) | test (khoá) | all")
+    ap.add_argument("--dump", action="store_true", help="eval: in từng khung sai / thiếu (lớp, khung, cỡ)")
     a = ap.parse_args(argv)
     return prefill(a) if a.cmd == "prefill" else evaluate(a)
 

@@ -54,6 +54,21 @@ chúng).
   phủ** (mảng chạm đa giác OCR + mẩu cỡ dấu trong vùng nới: nét bay, dấu thanh, gạch đầu dòng; không lấy nét của dòng khác). Cỡ
   chữ từ cao thân chữ (chữ hoa 0.72 em, chữ thường 0.53 em), màu từ nét.
 
+Luật chung (chỉnh trên dev, kiểm một lần trên test của `bench/slots_gt`, chia theo prompt; docs/SLOTS_GT.md):
+- "dòng" OCR không có chữ cái / chữ số (hàng sao) không phải chữ -> lớp phủ tách thành chi tiết;
+- tách dòng OCR thành mục riêng tại khoảng không nét >= 1 cao dòng, hoặc tại chỗ OCR chèn >= 2 dấu cách (khối hẹp kẹp giữa =
+  icon, để riêng);
+- chi tiết tìm trên mặt nạ mở nhẹ 3 px (giữ icon nét mảnh), vỏ / khung chữ trên mặt nạ 5 px; nét mảnh đứng lẻ (không kèm dòng
+  chữ cùng hàng trong 2 cao dòng) = cảnh vẽ lại, bỏ; khung chi tiết theo mặt nạ 5 px khi có nét đậm;
+- chi tiết giống nhau cùng hàng cách nhau <= 0.5 cao = một chi tiết (hàng sao); chi tiết nhỏ hơn 0.5 cao dòng trung vị = vụn.
+Chữ số to OCR bỏ sót (số bước trong vòng tròn) thành chi tiết: designer được dùng lệnh `text` cho ô I.
+
+| Lớp (IoU >= 0.5) | dev F1 trước -> sau | test F1 trước -> sau |
+|---|---|---|
+| L | 0.950 -> 0.954 | 0.917 -> 0.926 |
+| S | 0.842 -> 0.842 | 1.000 -> 1.000 |
+| I | 0.505 -> 0.681 | 0.419 -> 0.717 |
+
 ### 4. Designer (`slots.py`)
 
 Một lời gọi VLM: prompt FLUX, câu khách, danh sách ô kèm số đo, 6 ảnh (nháp, nháp đánh dấu ô, 4 góc phóng 2×). VLM trả mỗi ô một

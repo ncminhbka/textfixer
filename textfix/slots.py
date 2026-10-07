@@ -23,6 +23,15 @@ SNAP_SIDE = 0.35     # nắn khung dòng: xét lớp phủ quanh đa giác OCR, 
 SNAP_UP = 0.9        # ... và lên 0.9 cao dòng (dấu thanh / mũ tiếng Việt)
 INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
 REPAIR_MAX = 6       # vòng sửa: tối đa 6 lỗi có ảnh (2 ảnh / lỗi) -- máy chủ VLM giới hạn số ảnh mỗi lời gọi
+GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
+                     # OCR gộp "địa chỉ [icon] website" ở chân trang thành một dòng)
+GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
+ICON_W = 1.6         # khối kẹp giữa hai khoảng không ở chỗ cắt, rộng <= 1.6 cao dòng = icon giữa hai mục
+INK_DE = 25.0        # điểm nét = khác màu nền khung dòng (trung vị viền khung) >= 25 ΔE
+ROW_GAP = 0.5        # chi tiết giống nhau (cao lệch <= 25%) cùng hàng (tâm lệch <= 25% cao), cách nhau <= 0.5 cao = MỘT chi tiết
+                     # (hàng sao, hàng chấm: designer dựng cả hàng bằng một thẻ)
+DETAIL_MIN = 0.5     # chi tiết I: cạnh dài >= 0.5 cao dòng chữ trung vị của poster (icon designer đặt không nhỏ hơn nửa chữ thân;
+                     # nhỏ hơn = vụn: mép vật FLUX vẽ lại, mẩu hoạ tiết)
 
 
 def _lab(x):
@@ -55,7 +64,9 @@ def lines(img: np.ndarray) -> list[dict]:
     from .glyph import measure
     from .ocr import read_lines
     H, W = img.shape[:2]
-    raw = read_lines(img)
+    # "dòng" không có chữ cái / chữ số (hàng sao "★★★★★", gạch, chấm) không phải chữ: để lớp phủ tách thành chi tiết I
+    raw = [l for l in read_lines(img) if any(ch.isalnum() for ch in l["text"])]
+    raw = [q for l in raw for q in _split_gaps(img, l)]
     L = []
     for i, l in enumerate(raw, 1):
         ang = float(l.get("angle") or 0.0)
@@ -74,6 +85,102 @@ def lines(img: np.ndarray) -> list[dict]:
         L.append({"id": f"L{i}", "box": [float(v) for v in l["box"]], "poly": l["poly"], "ocr": l["text"],
                   "size": float(h / (CAP_EM if caps else X_EM)), "color": m["color"] if m else None, "angle": ang})
     return L
+
+
+def _rows(I: list[dict]) -> list[dict]:
+    """Gộp chi tiết giống nhau xếp thành hàng (ROW_GAP) thành một chi tiết."""
+    I = sorted(I, key=lambda c: c["box"][0])
+    out = []
+    for c in I:
+        x0, y0, x1, y1 = c["box"]
+        h = y1 - y0
+        prev = next((o for o in reversed(out) if o.get("shell") == c.get("shell")
+                     and abs((o["_h"]) - h) <= 0.25 * max(o["_h"], h)
+                     and abs((o["box"][1] + o["box"][3]) / 2 - (y0 + y1) / 2) <= 0.25 * max(o["_h"], h)
+                     and 0 <= x0 - o["box"][2] <= ROW_GAP * max(o["_h"], h)), None)
+        if prev is None:
+            out.append({**c, "box": list(c["box"]), "_h": h})
+        else:
+            b = prev["box"]
+            prev["box"] = [min(b[0], x0), min(b[1], y0), max(b[2], x1), max(b[3], y1)]
+    for o in out:
+        o.pop("_h")
+    return out
+
+
+def _split_gaps(img: np.ndarray, l: dict) -> list[dict]:
+    """Tách dòng OCR (thẳng) thành các MỤC riêng:
+    (a) khoảng không nét rộng >= GAP_SPLIT cao dòng;
+    (b) chỗ OCR chèn >= 2 dấu cách (nó đánh dấu khoảng cách lớn): cắt tại khoảng không nét >= GAP_MIN cao dòng gần vị trí đó
+        nhất; nếu giữa hai khoảng không quanh đó là một khối hẹp (<= ICON_W cao dòng: icon giữa hai mục, "địa chỉ [điện thoại]
+        số") thì khối đó tách riêng, không thuộc dòng nào (lớp phủ tách nó thành chi tiết I).
+    Chữ chia theo dấu cách gần chỗ cắt nhất (OCR không cho toạ độ từng chữ: chỉ là gợi ý cho designer)."""
+    import re
+    if abs(l.get("angle") or 0) >= 2:
+        return [l]
+    x0, y0, x1, y1 = (int(round(v)) for v in l["box"])
+    h = y1 - y0
+    if h < 4 or x1 - x0 < 3 * h:
+        return [l]
+    lab = _lab(np.ascontiguousarray(img[max(0, y0):y1, max(0, x0):x1]))
+    border = np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]])
+    ink = (np.linalg.norm(lab - np.median(border, 0), axis=2) >= INK_DE).any(0)
+    cols = np.flatnonzero(ink)
+    if len(cols) < 2:
+        return [l]
+    W = x1 - x0
+    gaps = [(int(a) + 1, int(b)) for a, b in zip(cols[:-1], cols[1:]) if b - a - 1 >= GAP_MIN * h]   # [đầu, cuối) khoảng không nét
+    text = l["text"]
+    cuts = []   # (cột kết thúc mục trái, cột bắt đầu mục phải, vị trí chữ để chia)
+    for a, b in gaps:
+        if b - a >= GAP_SPLIT * h:
+            cuts.append((a, b, None))
+    for m in re.finditer(r" {2,}", text):
+        want = (m.start() + m.end()) / 2 / max(1, len(text)) * W
+        near = sorted(gaps, key=lambda g: abs((g[0] + g[1]) / 2 - want))
+        if not near or abs((near[0][0] + near[0][1]) / 2 - want) > 2 * h:
+            continue
+        g = near[0]
+        # khối hẹp kẹp giữa hai khoảng không liền nhau quanh chỗ cắt = icon tách riêng
+        side = [q for q in gaps if q != g and abs((q[0] + q[1]) / 2 - want) <= 2 * h]
+        pair = None
+        for q in side:
+            lo, hi = (g, q) if q[0] > g[0] else (q, g)
+            if 0 < hi[0] - lo[1] <= ICON_W * h:
+                pair = (lo[0], hi[1])
+        cuts.append((pair[0], pair[1], m) if pair else (g[0], g[1], m))
+    if not cuts:
+        return [l]
+    cuts = sorted({(a, b): (a, b, m) for a, b, m in cuts}.values(), key=lambda c: c[0])
+    spans, start = [], int(cols[0])
+    for a, b, _ in cuts:
+        if a > start:
+            spans.append((start, a))
+        start = b
+    spans.append((start, int(cols[-1]) + 1))
+    # chia chữ: chỗ cắt có dấu cách kép dùng đúng vị trí đó, chỗ khác dùng dấu cách gần tỉ lệ vị trí cắt nhất
+    parts, pos = [], 0
+    for k, (a, b, m) in enumerate(cuts):
+        if m is not None:
+            cut, nxt = m.start(), m.end()
+        else:
+            want = int(round(len(text) * (a + b) / 2 / W))
+            sp = [i for i, ch in enumerate(text) if ch == " " and i > pos]
+            cut = min(sp, key=lambda i: abs(i - want)) if sp else max(pos + 1, want)
+            nxt = cut
+        parts.append(text[pos:cut])
+        pos = max(pos, nxt)
+    parts.append(text[pos:])
+    if len(parts) != len(spans):
+        return [l]
+    out = []
+    for (a, b), part in zip(spans, parts):
+        part = part.strip()
+        if not part or b - a < 2:
+            continue
+        bx = [float(x0 + a), float(y0), float(x0 + b), float(y1)]
+        out.append({**l, "text": part, "box": bx, "poly": [[bx[0], bx[1]], [bx[2], bx[1]], [bx[2], bx[3]], [bx[0], bx[3]]]})
+    return out or [l]
 
 
 def _snap(L: dict, ink: np.ndarray, others: np.ndarray) -> list[float]:
@@ -141,6 +248,10 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
     I = [c for c in O["I"] if all(_cov(c["box"], l["box"]) < 0.3 and _cov(l["box"], c["box"]) < 0.5 for l in L)]
     area = lambda b: (b[2] - b[0]) * (b[3] - b[1])   # noqa: E731
     I = [c for c in I if not any(o is not c and _cov(o["box"], c["box"]) >= 0.8 and area(o["box"]) > area(c["box"]) for o in I)]
+    I = _rows(I)
+    if L:   # vụn nhỏ hơn nửa chữ thân không phải chi tiết
+        lh = float(np.median([l["box"][3] - l["box"][1] for l in L]))
+        I = [c for c in I if max(c["box"][2] - c["box"][0], c["box"][3] - c["box"][1]) >= DETAIL_MIN * lh]
     for k, c in enumerate(I, 1):
         c["id"] = f"I{k}"
     for s in S:
@@ -217,7 +328,7 @@ add border / shadow / gradient / transparency if the draft shows it), html "". O
 - I#: kind "icon", slots ["I3"], html = ONE helper tag without a size (it fills the slot): <i-icon name="<lucide name>" \
 color="#hex"></i-icon>; a person avatar -> <i-icon name="circle-user" color="#hex"></i-icon>; a star row -> <i-stars n="5" \
 fill="#f5b301" empty="#d9d9d9"></i-stars>. Pick the icon from what the model drew and what the nearby text means. Or kind \
-"skip" for junk or duplicates, or kind "keep" for a detail that belongs to the picture (a logo or graphic printed on a product, \
+"text" (html = the text) if the detail is really a big character or number OCR missed (a step number "1" in a circle), or kind "skip" for junk or duplicates, or kind "keep" for a detail that belongs to the picture (a logo or graphic printed on a product, \
 package or object, a sign in the scene: its original pixels are restored).
 - L#: kind "text", slots ["L5"] or ["L5","L6"], html = the text. Or kind "keep" for text printed on a product, package, screen \
 or object in the photo (its original pixels are restored, never redraw such text), or kind "skip" for junk / duplicates.

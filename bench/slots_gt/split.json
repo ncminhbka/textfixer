@@ -1,0 +1,4 @@
+{
+ "note": "Chia theo PROMPT (hai seed cùng phía). Chỉ chỉnh bộ đo trên dev; test khoá, chạy một lần khi chốt (slots_gt.py eval --split test).",
+ "test": ["e03", "m02", "m04", "h03", "h07", "r02", "r04"]
+}

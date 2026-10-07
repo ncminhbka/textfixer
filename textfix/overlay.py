@@ -20,7 +20,8 @@ from __future__ import annotations
 import numpy as np
 
 DIFF = 20.0        # ΔE nháp - bản xoá coi là lớp phủ
-OPEN = 5           # mở hình thái (px): bỏ viền 1-2 px của ảnh hơi lệch khi xoá
+OPEN = 5           # mở hình thái (px): bỏ viền 1-2 px của ảnh hơi lệch khi xoá -- mặt nạ cho VỎ và nắn khung CHỮ
+DETAIL_OPEN = 3    # ... riêng cho CHI TIẾT: 5 px xoá mất icon nét mảnh 2-3 px (vụn thêm ra do mở nhẹ: lọc theo cỡ ở slots)
 SHELL_MIN = 0.004  # vỏ: diện tích >= 0.4% ảnh ...
 SHELL_SOLID = 0.55  # ... hình gọn (diện tích / khung >= 55%) ...
 SHELL_OUT = 0.15    # vỏ THÒ RA ngoài khung dòng chữ >= 15% diện tích (phần đệm); nét chữ đậm nằm gọn trong khung dòng
@@ -58,6 +59,7 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
     A, B = _lab(draft), _lab(plate)
     e = cv2.GaussianBlur(np.linalg.norm(A - B, axis=2), (0, 0), 1.0)
     ov = (e > DIFF).astype(np.uint8)
+    ov_fine = cv2.morphologyEx(ov, cv2.MORPH_OPEN, np.ones((DETAIL_OPEN, DETAIL_OPEN), np.uint8)).astype(bool)
     ov = cv2.morphologyEx(ov, cv2.MORPH_OPEN, np.ones((OPEN, OPEN), np.uint8))
     text = text_mask(draft, lines)
     rest = ov.astype(bool) & ~text   # lớp phủ không phải chữ
@@ -99,9 +101,9 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
                       "_mask": sm, "_fill_lab": _lab(fill.reshape(1, 1, 3).astype(np.uint8))[0, 0]})
             shell_mask |= sm
     # chi tiết nhỏ: (a) mảng lớp phủ ngoài vỏ, không phải chữ; (b) trong vỏ, khác màu lòng vỏ, không phải chữ
-    cand = (rest & ~shell_mask).astype(np.uint8)
+    cand = (ov_fine & ~text & ~shell_mask).astype(np.uint8)
     for s in S:
-        inner = s["_mask"] & ~text & ov.astype(bool) & (np.linalg.norm(A - s["_fill_lab"], axis=2) > INNER_DE)
+        inner = s["_mask"] & ~text & ov_fine & (np.linalg.norm(A - s["_fill_lab"], axis=2) > INNER_DE)
         inner = cv2.erode(s["_mask"].astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool) & inner   # bỏ viền / bóng mép vỏ
         cand |= inner.astype(np.uint8)
     cand = cv2.morphologyEx(cand, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
@@ -117,8 +119,18 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
                and max(w, h) <= 0.8 * (l["box"][3] - l["box"][1]) for l in lines):
             continue
         sel = cc == i
+        # nét MẢNH (chỉ có trên mặt nạ mở nhẹ): icon nét mảnh designer đặt luôn đi kèm một dòng chữ cùng hàng (icon đầu dòng,
+        # icon liên hệ); mảnh mảnh đứng lẻ giữa cảnh = cảnh FLUX vẽ lại (confetti, vệt sáng, mép vật)
+        if ov.astype(bool)[sel].mean() < 0.2 and not any(
+                l["box"][1] - 0.5 * (l["box"][3] - l["box"][1]) <= cy <= l["box"][3] + 0.5 * (l["box"][3] - l["box"][1])
+                and max(l["box"][0] - (x + w), x - l["box"][2]) <= 2 * (l["box"][3] - l["box"][1]) for l in lines):
+            continue
         shell = next((s["id"] for s in S if s["_mask"][sel].mean() > 0.5), None)
         col = np.median(draft[sel], axis=0)
+        core = sel & ov.astype(bool)   # khung theo mặt nạ mở 5 px nếu chi tiết có nét đậm (mặt nạ mịn lấy thêm viền)
+        if core.sum() >= 0.5 * sel.sum():
+            ys, xs = np.nonzero(core)
+            x, y, w, h = int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
         I.append({"id": f"I{len(I) + 1}", "box": [float(x), float(y), float(x + w), float(y + h)],
                   "color": "#%02x%02x%02x" % tuple(int(v) for v in col), "shell": shell})
     for s in S:
