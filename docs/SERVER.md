@@ -19,6 +19,19 @@ bash scripts/start_server.sh
 # 6. mở https://<địa-chỉ-jupyter>/user/<tên>/proxy/8088/   (nhớ dấu / cuối)
 ```
 
+## Cập nhật mã (không git pull được)
+
+Tải zip mới của repo (GitHub: Code -> Download ZIP), tải lên `~/work`, rồi **chép đè** lên thư mục repo đang dùng. Zip không có
+`output/` (đã gitignore) nên kết quả cũ, `.env` giữ nguyên:
+
+```bash
+cd ~/work && rm -rf _new && mkdir _new && unzip -q <tên zip>.zip -d _new
+cp -a _new/*/. ~/work/<thư mục repo>/     # đè mã, giữ output/ và .env
+rm -rf _new <tên zip>.zip
+```
+
+Không xoá thư mục repo cũ rồi giải nén lại: mất `output/`.
+
 ## 1. Cần có trong `~/persistent-data`
 
 | Thứ | Đường dẫn | Ghi chú |
