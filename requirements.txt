@@ -1,0 +1,17 @@
+# TextFix (docs/SERVER.md). Máy chủ đã có torch bản CUDA: pip giữ nguyên (đã thoả >=2.4), không cài đè bản CPU.
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10
+torch>=2.4
+torchvision>=0.19
+einops>=0.8
+safetensors>=0.4.5
+accelerate>=0.34
+transformers>=4.51        # flux2 (bộ mã hoá chữ Qwen3)
+rapidocr-onnxruntime>=1.2 # OCR, mô hình ONNX nằm sẵn trong gói
+playwright>=1.45          # dựng HTML; Chromium: PLAYWRIGHT_CHROME_PATH (docs/SERVER.md)
+openai>=1.40              # LLM / VLM qua API OpenAI-compatible (vLLM)
+fastapi>=0.110
+uvicorn>=0.28
+pydantic>=2.6
+packaging>=23             # scripts/check_server.py so phiên bản gói

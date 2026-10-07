@@ -1,0 +1,350 @@
+[
+ {
+  "key": "p11_distill_s4",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Create a customer feedback advertisement for a premium gym and personal training service. Headline: \"Khách hàng nói gì sau 90 ngày thay đổi?\". Product/service name: \"Private Coaching Transformation\". Short feedback description: \"97% khách hàng hài lòng với kết quả tăng cơ, cải thiện vóc dáng và sức khỏe chỉ sau 3 tháng tập luyện cùng PT riêng\". Key features: \"PT 1:1 riêng tư, giáo án cá nhân hóa, theo dõi dinh dưỡng và form tập chi tiết\". Special offer: \"Giảm 20% gói PT tháng đầu cho khách hàng mới\". Modern premium fitness style, luxurious gym background, show a five-star review and before/after customer photos, strong black and red tones, bold standout typography, cinematic lighting, professional layout like a Facebook/Instagram fitness ad, ultra realistic, high detail.",
+  "texts": [
+   {
+    "text": "Khách hàng nói gì sau 90 ngày thay đổi?",
+    "role": "headline"
+   },
+   {
+    "text": "Private Coaching Transformation",
+    "role": "subheadline"
+   },
+   {
+    "text": "97% khách hàng hài lòng với kết quả tăng cơ, cải thiện vóc dáng và sức khỏe chỉ sau 3 tháng tập luyện cùng PT riêng",
+    "role": "body"
+   },
+   {
+    "text": "PT 1:1 riêng tư, giáo án cá nhân hóa, theo dõi dinh dưỡng và form tập chi tiết",
+    "role": "body"
+   },
+   {
+    "text": "Giảm 20% gói PT tháng đầu cho khách hàng mới",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "p19_distill_s4",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Create a customer feedback advertisement for a kitchen appliance. Headline: \"Món nướng ngoài giòn trong mọng nước, mẹ nhàn tênh\". Product name: \"Nồi Chiên Hơi Nước ChefPro 15L\". Short description: \"Các bà nội trợ cực kỳ hài lòng vì đồ ăn không bị khô khốc như nồi cũ, giữ trọn vẹn dinh dưỡng và dễ dàng vệ sinh nhờ chế độ tự làm sạch\". Key features: \"Công nghệ kết hợp chiên không dầu và hấp siêu nhiệt, dung tích lớn quay gà nguyên con, màn hình cảm ứng 12 chế độ, lòng nồi chống dính ceramic\". Offer: \"Tặng bộ phụ kiện 5 món và sách công thức độc quyền\". Cozy, premium kitchen style. Modern kitchen background, show a five-star review. A golden roast chicken with steam rising inside the glass chamber of a modern air fryer. Glossy black appliance and golden-orange food tones, warm typography, food photography style, ultra realistic.",
+  "texts": [
+   {
+    "text": "Món nướng ngoài giòn trong mọng nước, mẹ nhàn tênh",
+    "role": "headline"
+   },
+   {
+    "text": "Nồi Chiên Hơi Nước ChefPro 15L",
+    "role": "subheadline"
+   },
+   {
+    "text": "Các bà nội trợ cực kỳ hài lòng vì đồ ăn không bị khô khốc như nồi cũ, giữ trọn vẹn dinh dưỡng và dễ dàng vệ sinh nhờ chế độ tự làm sạch",
+    "role": "body"
+   },
+   {
+    "text": "Công nghệ kết hợp chiên không dầu và hấp siêu nhiệt, dung tích lớn quay gà nguyên con, màn hình cảm ứng 12 chế độ, lòng nồi chống dính ceramic",
+    "role": "body"
+   },
+   {
+    "text": "Tặng bộ phụ kiện 5 món và sách công thức độc quyền",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "p20_distill_s7",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Create an advertisement for a premium wedding studio. Headline: \"Lưu giữ khoảnh khắc thanh xuân rực rỡ nhất\". Service name: \"Gói Chụp Ảnh Cưới Cinematic Love\". Short description: \"Cô dâu chú rể vỡ òa hạnh phúc khi nhận album cưới mang đậm chất điện ảnh, tự nhiên và ngập tràn cảm xúc\". Key features: \"Bao gồm 3 váy cưới thiết kế cao cấp, makeup artist chuyên nghiệp đi kèm, concept cá nhân hóa theo câu chuyện tình yêu, không phát sinh chi phí\". Offer: \"Tặng ngay 1 ảnh cổng tráng gương pha lê và clip hậu trường trị giá 3 triệu\". Romantic, elegant luxury wedding style. Background of a sunrise beach or classical architecture. Show a five-star rating. The bride and groom sharing a passionate kiss under beautiful backlight. White, beige and warm golden-hour tones, flowing soft signature-script typography, cinematic lighting.",
+  "texts": [
+   {
+    "text": "Lưu giữ khoảnh khắc thanh xuân rực rỡ nhất",
+    "role": "headline"
+   },
+   {
+    "text": "Gói Chụp Ảnh Cưới Cinematic Love",
+    "role": "subheadline"
+   },
+   {
+    "text": "Cô dâu chú rể vỡ òa hạnh phúc khi nhận album cưới mang đậm chất điện ảnh, tự nhiên và ngập tràn cảm xúc",
+    "role": "body"
+   },
+   {
+    "text": "Bao gồm 3 váy cưới thiết kế cao cấp, makeup artist chuyên nghiệp đi kèm, concept cá nhân hóa theo câu chuyện tình yêu, không phát sinh chi phí",
+    "role": "body"
+   },
+   {
+    "text": "Tặng ngay 1 ảnh cổng tráng gương pha lê và clip hậu trường trị giá 3 triệu",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "p18_distill_s5",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Create an advertisement for a fintech app. Headline: \"Quản lý chi tiêu thông minh, tiền đẻ ra tiền\". Product name: \"WealthMaster App\". Short description: \"Người dùng đã tiết kiệm được 30% thu nhập mỗi tháng nhờ hệ thống cảnh báo chi tiêu và AI phân tích danh mục đầu tư tự động\". Key features: \"Đồng bộ giao dịch tự động từ 50+ ngân hàng, lập ngân sách bằng AI, bảo mật chuẩn quân đội, giao diện trực quan\". Offer: \"Miễn phí nâng cấp tài khoản Premium 6 tháng khi tải app hôm nay\". Modern, minimalist fintech style. Background of blurred glowing green growth charts, show a five-star App Store rating. A hyper-realistic 3D iPhone mockup showing the app interface, next to a successful young person smiling. Deep navy tones, crisp digital typography, soft neon lighting.",
+  "texts": [
+   {
+    "text": "Quản lý chi tiêu thông minh, tiền đẻ ra tiền",
+    "role": "headline"
+   },
+   {
+    "text": "WealthMaster App",
+    "role": "subheadline"
+   },
+   {
+    "text": "Người dùng đã tiết kiệm được 30% thu nhập mỗi tháng nhờ hệ thống cảnh báo chi tiêu và AI phân tích danh mục đầu tư tự động",
+    "role": "body"
+   },
+   {
+    "text": "Đồng bộ giao dịch tự động từ 50+ ngân hàng, lập ngân sách bằng AI, bảo mật chuẩn quân đội, giao diện trực quan",
+    "role": "body"
+   },
+   {
+    "text": "Miễn phí nâng cấp tài khoản Premium 6 tháng khi tải app hôm nay",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "p13_distill_s6",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Create a customer feedback advertisement for a luxury glamping resort. Headline: \"Trải nghiệm chữa lành giữa thiên nhiên tuyệt mỹ\". Product/service name: \"Cloud Retreat Glamping\". Short description: \"98% khách hàng đánh giá đây là điểm đến lý tưởng để tái tạo năng lượng, rời xa khói bụi thành phố dịp cuối tuần\". Key features: \"Lều Dome view săn mây 360 độ, BBQ riêng tư tại lều, rạp chiếu phim ngoài trời và lửa trại ấm cúng\". Offer: \"Giảm 30% khi đặt phòng sớm trước 14 ngày\". Premium travel and resort style, background of glowing glamping tents in a pine forest at sunset. Show a five-star review with a photo of a couple warmly clinking glasses of red wine. Warm orange and rustic moss green tones, elegant typography, dramatic cinematic lighting, photorealistic, high detail.",
+  "texts": [
+   {
+    "text": "Trải nghiệm chữa lành giữa thiên nhiên tuyệt mỹ",
+    "role": "headline"
+   },
+   {
+    "text": "Cloud Retreat Glamping",
+    "role": "subheadline"
+   },
+   {
+    "text": "98% khách hàng đánh giá đây là điểm đến lý tưởng để tái tạo năng lượng, rời xa khói bụi thành phố dịp cuối tuần",
+    "role": "body"
+   },
+   {
+    "text": "Lều Dome view săn mây 360 độ, BBQ riêng tư tại lều, rạp chiếu phim ngoài trời và lửa trại ấm cúng",
+    "role": "body"
+   },
+   {
+    "text": "Giảm 30% khi đặt phòng sớm trước 14 ngày",
+    "role": "offer"
+   }
+  ]
+ },
+ {
+  "key": "q03_distill_s1",
+  "w": 1024,
+  "h": 1024,
+  "prompt": "Recruitment poster for a technology company, clean corporate blue and white design with abstract geometric shapes. Headline \"TUYỂN DỤNG\" in a bold sans-serif font. Position list: \"Lập trình viên Backend\", \"Chuyên viên Kiểm thử\", \"Thiết kế UI/UX\". Salary line \"Lương 15 - 30 triệu\". Contact \"Gửi CV về tuyendung@congty.vn\". Professional, modern.",
+  "texts": [
+   {
+    "text": "TUYỂN DỤNG",
+    "role": "headline"
+   },
+   {
+    "text": "Lập trình viên Backend",
+    "role": "list_item"
+   },
+   {
+    "text": "Chuyên viên Kiểm thử",
+    "role": "list_item"
+   },
+   {
+    "text": "Thiết kế UI/UX",
+    "role": "list_item"
+   },
+   {
+    "text": "Lương 15 - 30 triệu",
+    "role": "offer"
+   },
+   {
+    "text": "Gửi CV về tuyendung@congty.vn",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "q05_distill_s2",
+  "w": 896,
+  "h": 1120,
+  "prompt": "Luxury wedding invitation card, ivory paper texture with delicate gold floral line art and soft watercolor roses. Large names \"Minh Anh & Quốc Bảo\" in a flowing calligraphy script font. Text \"Trân trọng kính mời\" in a small serif font above. Date \"Chủ Nhật, 20 tháng 12 năm 2026\". Venue \"Trung tâm Tiệc cưới Riverside\". Romantic and elegant.",
+  "texts": [
+   {
+    "text": "Minh Anh & Quốc Bảo",
+    "role": "headline"
+   },
+   {
+    "text": "Trân trọng kính mời",
+    "role": "subheadline"
+   },
+   {
+    "text": "Chủ Nhật, 20 tháng 12 năm 2026",
+    "role": "date"
+   },
+   {
+    "text": "Trung tâm Tiệc cưới Riverside",
+    "role": "info"
+   }
+  ]
+ },
+ {
+  "key": "q09_distill_s1",
+  "w": 896,
+  "h": 1120,
+  "prompt": "Travel tour advertisement, misty pine hills and flower fields of Da Lat at sunrise, dreamy soft colors. Headline \"ĐÀ LẠT MỘNG MƠ\" in a bold white serif font with a soft shadow. Text \"Tour 3 ngày 2 đêm\". Price \"Chỉ 2.990.000đ/khách\". Inclusions: \"Xe đưa đón\", \"Khách sạn 4 sao\", \"Hướng dẫn viên\". Fresh and inviting.",
+  "texts": [
+   {
+    "text": "ĐÀ LẠT MỘNG MƠ",
+    "role": "headline"
+   },
+   {
+    "text": "Tour 3 ngày 2 đêm",
+    "role": "subheadline"
+   },
+   {
+    "text": "Chỉ 2.990.000đ/khách",
+    "role": "price"
+   },
+   {
+    "text": "Xe đưa đón",
+    "role": "list_item"
+   },
+   {
+    "text": "Khách sạn 4 sao",
+    "role": "list_item"
+   },
+   {
+    "text": "Hướng dẫn viên",
+    "role": "list_item"
+   }
+  ]
+ },
+ {
+  "key": "q18_distill_s1",
+  "w": 1152,
+  "h": 864,
+  "prompt": "Car service center advertisement, a shiny black sedan in a clean modern garage with blue LED lights. Headline \"BẢO DƯỠNG TOÀN DIỆN\" in a strong bold sans-serif font. List: \"Thay dầu chính hãng\", \"Kiểm tra 50 hạng mục\", \"Rửa xe miễn phí\". Offer \"Giảm 25% cho lần đầu\". Hotline \"1900 6868\".",
+  "texts": [
+   {
+    "text": "BẢO DƯỠNG TOÀN DIỆN",
+    "role": "headline"
+   },
+   {
+    "text": "Thay dầu chính hãng",
+    "role": "list_item"
+   },
+   {
+    "text": "Kiểm tra 50 hạng mục",
+    "role": "list_item"
+   },
+   {
+    "text": "Rửa xe miễn phí",
+    "role": "list_item"
+   },
+   {
+    "text": "Giảm 25% cho lần đầu",
+    "role": "offer"
+   },
+   {
+    "text": "1900 6868",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "q21_distill_s0",
+  "w": 896,
+  "h": 1120,
+  "prompt": "Skincare product advertisement, a glass serum bottle on wet pebbles with water droplets and green leaves, fresh clean light. Product name \"Serum Rau Má Thuần Chay\" in an elegant serif font. Benefits: \"Làm dịu da mụn\", \"Phục hồi hàng rào bảo vệ\", \"Không cồn, không hương liệu\". Price \"Chỉ 289.000đ\".",
+  "texts": [
+   {
+    "text": "Serum Rau Má Thuần Chay",
+    "role": "headline"
+   },
+   {
+    "text": "Làm dịu da mụn",
+    "role": "list_item"
+   },
+   {
+    "text": "Phục hồi hàng rào bảo vệ",
+    "role": "list_item"
+   },
+   {
+    "text": "Không cồn, không hương liệu",
+    "role": "list_item"
+   },
+   {
+    "text": "Chỉ 289.000đ",
+    "role": "price"
+   }
+  ]
+ },
+ {
+  "key": "q32_distill_s1",
+  "w": 896,
+  "h": 1120,
+  "prompt": "Motorbike rental poster, a scooter parked on a scenic coastal road with the ocean behind, bright sunny day. Headline \"THUÊ XE MÁY TỰ LÁI\" in a bold sporty italic font. List: \"Xe đời mới\", \"Giao xe tận nơi\", \"Giá từ 120.000đ/ngày\". Phone \"0905 678 910\".",
+  "texts": [
+   {
+    "text": "THUÊ XE MÁY TỰ LÁI",
+    "role": "headline"
+   },
+   {
+    "text": "Xe đời mới",
+    "role": "list_item"
+   },
+   {
+    "text": "Giao xe tận nơi",
+    "role": "list_item"
+   },
+   {
+    "text": "Giá từ 120.000đ/ngày",
+    "role": "list_item"
+   },
+   {
+    "text": "0905 678 910",
+    "role": "contact"
+   }
+  ]
+ },
+ {
+  "key": "q14_distill_s0",
+  "w": 1344,
+  "h": 768,
+  "prompt": "Product launch banner for a new smartphone, dark gradient background with glowing purple light, the phone floating at an angle. Headline \"RA MẮT\" in a thin wide tracked uppercase font. Product name \"Nova X Pro\" in a large bold futuristic font. Specs: \"Camera 200MP\", \"Pin 5.000mAh\", \"Sạc nhanh 120W\". Price \"Từ 12.990.000đ\".",
+  "texts": [
+   {
+    "text": "RA MẮT",
+    "role": "headline"
+   },
+   {
+    "text": "Nova X Pro",
+    "role": "subheadline"
+   },
+   {
+    "text": "Camera 200MP",
+    "role": "list_item"
+   },
+   {
+    "text": "Pin 5.000mAh",
+    "role": "list_item"
+   },
+   {
+    "text": "Sạc nhanh 120W",
+    "role": "list_item"
+   },
+   {
+    "text": "Từ 12.990.000đ",
+    "role": "price"
+   }
+  ]
+ }
+]

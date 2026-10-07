@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+output/
+.env
+.env.*
+!.env.example
+server.log
+check.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# ảnh / gói dữ liệu không vào git (icon SVG trong assets vẫn giữ)
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.bmp
+*.zip
+*.tar
+*.tar.gz
+*.tgz
