@@ -93,7 +93,9 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         text = _norm(t.get("text", ""))
         if not text or text in seen:
             continue
-        if not any(text in s for s in sources):   # không nguyên văn từ người dùng -> bỏ (không bịa chữ)
+        # không nguyên văn từ người dùng -> bỏ (không bịa chữ); so không phân biệt hoa / thường (08/10: "Khai trương cửa hàng ..."
+        # viết hoa chữ đầu, prompt khách viết thường -> bị bỏ oan, tiêu đề mất khỏi câu khách -> VLM chép chữ nháp "TRƯỞNG")
+        if not any(text.casefold() in s.casefold() for s in sources):
             log["dropped"].append(text)
             continue
         seen.add(text)
@@ -106,6 +108,9 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             seen.add(qn)
             log["added"].append(qn)
     pe, miss = _fix_prompt(raw.get("prompt_en", ""), out)
+    gone = _quoted_extra(raw.get("prompt_en", ""), out)
+    if gone:
+        log["quoted_removed"] = gone
     if miss:
         log["quoted_added"] = miss
     variants = []
@@ -118,9 +123,42 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     return {"prompt_en": pe, "texts": out, "variants": variants, "log": log}
 
 
+def _approved(q: str, texts: list[dict]) -> bool:
+    """Chuỗi trong ngoặc kép của prompt_en là chữ khách: trùng một câu, nằm trong một câu, hoặc ghép từ các câu khách."""
+    q = _norm(q).casefold()
+    tx = [t["text"].casefold() for t in texts]
+    if any(q in t for t in tx):
+        return True
+    parts = [t for t in tx if t in q]
+    return bool(parts) and sum(len(t) for t in parts) >= 0.8 * len(q)
+
+
+def _sentences(pe: str) -> list[str]:
+    """Tách câu, không tách trong ngoặc kép ("TP. HCM", "Mở cửa 7:00!")."""
+    out, cur, inq = [], "", False
+    for i, ch in enumerate(pe):
+        cur += ch
+        if ch == '"':
+            inq = not inq
+        elif ch in ".!?" and not inq and (i + 1 == len(pe) or pe[i + 1].isspace()):
+            out.append(cur)
+            cur = ""
+    return out + ([cur] if cur.strip() else [])
+
+
+def _quoted_extra(pe: str, texts: list[dict]) -> list[str]:
+    return [q for q in dict.fromkeys(QUOTED.findall(pe)) if not _approved(q, texts)]
+
+
 def _fix_prompt(pe: str, texts: list[dict]) -> tuple[str, list[str]]:
     """Không tỉ lệ / độ phân giải trong prompt -- chỉ NGOÀI ngoặc kép (chữ người dùng như "8:30" giữ nguyên); chữ khách chưa nằm
-    trong ngoặc kép thì nối vào cuối (model chỉ vẽ được chữ nó thấy)."""
+    trong ngoặc kép thì nối vào cuối (model chỉ vẽ được chữ nó thấy). Chữ trong ngoặc kép KHÔNG phải chữ khách (câu LLM bịa, đã
+    bị bỏ khỏi texts) -> bỏ cả câu chứa nó: FLUX vẫn vẽ, VLM chép lại thành chữ không ai duyệt (08/10: địa chỉ bịa "123 Đường Số
+    1, Quận 1, TP. HCM" bị bỏ khỏi texts nhưng còn trong prompt -> lên cả 4 poster)."""
+    bad_q = set(_quoted_extra(pe, texts))
+    if bad_q:
+        keep = [s for s in _sentences(pe) if not set(QUOTED.findall(s)) & bad_q]
+        pe = "".join(keep)
     parts = pe.split('"')
     bad = re.compile(r"\b(?:1:1|9:16|16:9|4:5|5:4|2:3|3:2|4:3|3:4|21:9)\b|\b\d{3,4}p\b|\b[248]k\b", re.I)
     pe = '"'.join(bad.sub("", p) if i % 2 == 0 else p for i, p in enumerate(parts))

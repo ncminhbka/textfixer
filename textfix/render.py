@@ -257,6 +257,10 @@ async (o) => {
     const m0 = m.v;   // tràn đo khi CHƯA xoay (sau khi xoay, khung thẳng ôm ngoài lệch so với nội dung)
     if (e.angle) { d.style.transformOrigin = '50% 50%'; d.style.transform = `rotate(${e.angle}deg)`; m = over(); m.v = m0; }
     const q = m.q, b = d.getBoundingClientRect();
+    // NÉT MỰC = hộp chữ trừ phần đệm trên / dưới của font (dòng chồng sát nhau như FLASH / SALE thì hộp font chồng 0.2-0.3 dù
+    // nét không chạm: 08/10 server 15/27 ảnh báo content_overlap oan, vòng sửa chạy vì nó). Chữ xoay: giữ hộp ngoài.
+    const fsn = parseFloat(d.style.fontSize) || 0;
+    const it = e.angle ? 0 : Math.min(pad.top * fsn, (q.bottom - q.top) / 3), ib = e.angle ? 0 : Math.min(pad.bot * fsn, (q.bottom - q.top) / 3);
     // MÀU CHỮ thật (màu tính được của phần tử chứa nhiều chữ nhất) + có hiệu ứng tách nền không (bóng / viền / chữ tô gradient)
     let fg = null, fx = false, best = 0, fs = null, ff = null, fw = null;
     const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
@@ -267,7 +271,7 @@ async (o) => {
       if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
     }
     out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw,
-              ink: [q.left - R0.left, q.top - R0.top, q.right - R0.left, q.bottom - R0.top],
+              ink: [q.left - R0.left, q.top - R0.top + it, q.right - R0.left, q.bottom - R0.top - ib],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
   return out;

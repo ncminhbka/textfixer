@@ -730,6 +730,7 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
     1. DẤU: chữ khớp một chữ của câu khách khi bỏ dấu nhưng khác dấu ("TRƯỞNG", "TRƯỜNG" cho "TRƯƠNG") -> thay bằng chữ của
        khách (giữ hoa / thường). Chỉ xét lệnh đang viết câu khách: có "client", hoặc cả dòng (bỏ dấu) nằm trong một câu khách.
     2. CHỮ BỊA: lệnh khai viết câu khách T# mà không chữ nào có trong bất kỳ câu khách nào ("SƯ PRING" chép từ mẩu OCR vỡ) -> skip.
+    2b. SỐ BỊA: lệnh không khai câu khách mà có số không nằm trong câu khách nào -> skip.
     3. LẶP: nháp hay vẽ một dòng hai lần (ngày, giá, nhãn huy hiệu); hai lệnh viết cùng một chữ (bỏ dấu, >= 3 ký tự) mà câu
        khách không lặp -> giữ lệnh có chữ OCR của ô giống nhất, lệnh kia skip (nền xoá sạch ở đó)."""
     from difflib import SequenceMatcher
@@ -751,6 +752,13 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
                 not any(_flat(plain) in _flat(t) for t in txt):   # chữ dính / tách khác câu khách vẫn là chữ khách
             log.append(f"{op.get('id')}: chữ không có trong câu khách ({plain!r} khai {op.get('client')}) -> skip")
             out.append({**op, "kind": "skip", "html": "", "why": "guard: invented text"})
+            continue
+        nums = re.findall(r"\d+", plain)
+        if own is None and nums and not all(any(n in t for t in txt) for n in nums):
+            # SỐ BỊA: lệnh không khai câu khách mà viết số không có trong câu khách nào (địa chỉ / giá / điện thoại / ngày nháp tự
+            # vẽ, 08/10 "123 Đường Số 1, Quận 1, TP. HCM") -> skip: dữ kiện không bao giờ bịa
+            log.append(f"{op.get('id')}: số không có trong câu khách ({plain!r}) -> skip")
+            out.append({**op, "kind": "skip", "html": "", "why": "guard: invented fact"})
             continue
         src = [own] if own is not None else [t for t, f in zip(txt, ftxt) if fp and f" {fp} " in f" {f} "]
         if src:
