@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 
 import numpy as np
@@ -872,10 +873,13 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
             + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nStyle: {json.dumps(P.get('style'), ensure_ascii=False)}"
             f"\n\nRendered ops:\n{json.dumps(rows, ensure_ascii=False)}\n\nCODE CHANGES (engine log, op ids):\n"
-            + ("\n".join(ch) or "(none)") + "\n\nERRORS:\n" + ("\n".join(json.dumps(e, ensure_ascii=False) for e in errs) or "(none)"))
-    imgs = ["DRAFT:", _png(draft), "PROOF:", _png(proof), "PROOF-IDS:", _png(_ids_image(proof, M, P)),
-            "COMPARE (draft | proof):", *_compare(draft, proof, M)]
-    out = _obj(call(*((_system(SYSTEM) + "\n\n" + REVIEW, [user, *imgs]) + ((meta,) if meta is not None else ()))))
+            + ("\n".join(ch) or "(none)") + "\n\nERRORS:\n"
+            + ("\n".join(json.dumps(e, ensure_ascii=False) for e in errs if REVIEW_MODE == "full" or e["type"] in SEVERE) or "(none)"))
+    full = REVIEW_MODE == "full"
+    imgs = ["DRAFT:", _png(draft), "PROOF:", _png(proof), "PROOF-IDS:", _png(_ids_image(proof, M, P))] + \
+        (["COMPARE (draft | proof):", *_compare(draft, proof, M)] if full else [])
+    sysmsg = _system(SYSTEM) + "\n\n" + REVIEW + ("" if full else "\n\n" + ONLY_ERRORS)
+    out = _obj(call(*((sysmsg, [user, *imgs]) + ((meta,) if meta is not None else ()))))
     new, patches = [], {p.get("id"): p for p in out.get("patches") or [] if isinstance(p, dict) and p.get("id")}
     for op in P["ops"]:
         p = patches.pop(op["id"], None)
@@ -903,7 +907,22 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
                       "review_patches": len(out.get("patches") or [])})
 
 
-REVIEW_ROUNDS = 2   # dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
+REVIEW_ROUNDS = 2   # chế độ "full": dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
+# CHẾ ĐỘ (08/10, sau lượt 3-4: duyệt thẩm mỹ tốn ~20 s / poster, ~2 / 15 poster đẹp hơn, ~5 xấu đi -> không đáng):
+#   "errors" (mặc định) -- MỘT lượt, CHỈ khi lượt đầu có lỗi nặng (SEVERE), chỉ sửa đúng các lỗi đó (~1 / 3 poster)
+#   "full"   -- duyệt thẩm mỹ cả tấm, REVIEW_ROUNDS lượt, có giám khảo (slots.judge)
+REVIEW_MODE = os.environ.get("TEXTFIX_REVIEW", "errors")
+ONLY_ERRORS = """MODE: FIX ONLY THE ERRORS. Fix exactly the ERRORS listed and nothing else -- every op not involved in an error \
+stays untouched; no aesthetic changes. Output "findings" for the errors only."""
+
+
+def review_rounds() -> int:
+    return REVIEW_ROUNDS if REVIEW_MODE == "full" else 1
+
+
+def review_needed(errs: list[dict]) -> bool:
+    """Có chạy vòng duyệt cho bản này không (theo REVIEW_MODE)."""
+    return REVIEW_MODE == "full" or any(e["type"] in SEVERE for e in errs)
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
 

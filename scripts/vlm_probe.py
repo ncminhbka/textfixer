@@ -44,11 +44,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", default="")
     ap.add_argument("--workers", type=int, default=4, help="số lời gọi VLM song song")
     ap.add_argument("--fresh", action="store_true", help="bỏ qua cache VLM (gọi mới)")
+    ap.add_argument("--review", default=None, choices=["errors", "full"], help="chế độ vòng duyệt (mặc định slots.REVIEW_MODE)")
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "output" / "vlm_probe")
     ap.add_argument("--ship-only", action="store_true")
     ap.add_argument("--no-ship", action="store_true")
     ap.add_argument("--zip-mb", type=float, default=None)
     a = ap.parse_args(argv)
+    if a.review:
+        slots.REVIEW_MODE = a.review
     config.load_env()
     meta = json.loads((a.pairs / "pairs.json").read_text(encoding="utf-8"))
     keys = [k for k in sorted(meta) if (a.pairs / f"{k}_draft.png").exists() and (not a.only or k in a.only.split(","))]
@@ -121,7 +124,9 @@ def main(argv: list[str] | None = None) -> int:
                 (a.out / v).mkdir(exist_ok=True)   # bản lượt đầu để so trước / sau duyệt
                 Image.fromarray(poster).save(a.out / v / f"{k}_r0.jpg", quality=85)
             # 4. vòng duyệt (song song mỗi lượt) -> dựng lại, giữ nếu không mất câu khách / không thêm lỗi nặng (slots.accept)
-            for r in range(1, slots.REVIEW_ROUNDS + 1):
+            for st in S.values():   # chế độ "errors": chỉ ảnh có lỗi nặng ở lượt đầu mới vào vòng duyệt
+                st["live"] = st["live"] and slots.review_needed(st["errs"])
+            for r in range(1, slots.review_rounds() + 1):
                 live = [(key, st) for key, st in S.items() if st["live"]]
                 cand = []
                 for (v, k), P2, mt, err in ex.map(review, live):
@@ -154,7 +159,8 @@ def main(argv: list[str] | None = None) -> int:
                 def jd(c):
                     (v, k), rnd, new = c
                     mt = {}
-                    better, why = slots.judge(D[k]["draft"], S[(v, k)]["poster"], new[1], vlm, meta=mt)
+                    better, why = slots.judge(D[k]["draft"], S[(v, k)]["poster"], new[1], vlm, meta=mt) \
+                        if slots.REVIEW_MODE == "full" else (True, "")
                     return c, better, why, mt
                 for ((v, k), rnd, (P2, poster2, errs2, res2, ch)), better, why, mt in ex.map(jd, cand):
                     st = S[(v, k)]

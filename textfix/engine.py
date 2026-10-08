@@ -85,9 +85,9 @@ class Engine:
         errs = render.check(P, M, res)
         log += rlog + [f"LỖI: {e}" for e in errs]
         T["dung"] = time.time() - t0
-        t0 = time.time()   # VÒNG DUYỆT: luôn chạy -- lỗi khách quan + lỗi thẩm mỹ VLM tự thấy trên bản dựng; tối đa REVIEW_ROUNDS
+        t0 = time.time()   # VÒNG DUYỆT (slots.REVIEW_MODE): "errors" -- 1 lượt, chỉ khi có lỗi nặng; "full" -- thẩm mỹ cả tấm
         changes = log[:]   # code đã đổi gì trong quyết định của VLM (chặn chữ, căn cột, cân cỡ...) -- vòng duyệt phải biết
-        for k in range(slots.REVIEW_ROUNDS):
+        for k in range(slots.review_rounds() if slots.review_needed(errs) else 0):
             self.progress(f"VLM duyệt {k + 1}")
             try:
                 P2, vlog2 = slots.validate(slots.review(draft, poster, M, P, errs, res, B["prompt_en"], B["texts"], self.vlm,
@@ -112,7 +112,7 @@ class Engine:
                 if P2 is not P3:
                     log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
                     break
-            better, why = slots.judge(draft, poster, poster2, self.vlm)   # giám khảo: bản duyệt có ĐẸP hơn không
+            better, why = slots.judge(draft, poster, poster2, self.vlm) if slots.REVIEW_MODE == "full" else (True, "")
             log.append(f"giám khảo: {'bản duyệt' if better else 'bản trước'} đẹp hơn ({why})")
             if not better:
                 break

@@ -115,7 +115,9 @@ với màu chữ, khối không có bóng / viền -> low_contrast), **cỡ khô
 cùng hàng, gần nhau; cỡ dựng lệch > 25% -> uneven_size). Renderer tự sửa trước khi duyệt: dòng cùng vai dựng cùng cỡ (cỡ nhỏ nhất nhóm), icon cùng hàng / cột cùng cỡ, chữ là toàn bộ
 nội dung một vỏ thì căn giữa dọc theo vỏ, font-size ở box_style là cỡ gốc của khung.
 
-**Vòng duyệt** (`slots.review`, 08/10, thay vòng sửa chỉ-khi-có-lỗi): luôn chạy, tối đa `REVIEW_ROUNDS` = 2 lượt (dừng khi VLM không
+**Vòng duyệt** (`slots.review`). Mặc định `REVIEW_MODE = "errors"`: MỘT lượt, chỉ khi lượt đầu có lỗi nặng (ô bỏ sót, chồng,
+tràn, chìm nền), chỉ sửa đúng các lỗi đó -- lượt 3-4 (08/10) cho thấy duyệt thẩm mỹ tốn ~20 s / poster mà ~2 / 15 poster đẹp hơn,
+~5 xấu đi. Chế độ `"full"` (`TEXTFIX_REVIEW=full`, `vlm_probe.py --review full`) giữ lại để thử: luôn chạy, tối đa `REVIEW_ROUNDS` = 2 lượt (dừng khi VLM không
 sửa gì). VLM là giám đốc nghệ thuật xem bản dựng thật: nháp, bản dựng, bản dựng có id lệnh, ảnh so sánh nháp | bản dựng ở các cụm
 ô (phóng), danh sách lệnh kèm cỡ nháp -> cỡ / độ đậm / font dựng thật, **nhật ký thay đổi của code** (chặn chữ, căn cột, cân cỡ...:
 không được đảo ngược, chỉ sửa nguyên nhân) và lỗi đo được. Trả `findings` (thấy gì) rồi `patches` (sửa html / box_style, gộp ô,
