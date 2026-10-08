@@ -476,11 +476,13 @@ Then fix each flaw with patches, and also every ERROR.
 Your tools (you may use any of them):
 - rewrite html / box_style of an op: font, weight, size, color, effects, line breaks, letter-spacing, padding, alignment;
 - MERGE slots: one op over several slots (e.g. all lines of a coin or badge in one op, the key word or number big on its own \
-line) -- the op is drawn over the union of its slots;
+line) -- the op is drawn over the union of its slots; stacked slots get one line each with <br> between them, never all \
+on one line;
 - move a client text to a better slot, split one over two slots, or give a slot to another op;
 - turn a slot into a shape (recreate a lost pill / band behind text), an icon, keep or skip;
 - delete an orphan or junk op that carries no client text.
-Change only what is wrong -- ops that look right stay untouched. Facts stay exact. Never drop a client text: a poster \
+Change only what is wrong -- ops that look right stay untouched. Facts stay exact; step / list numbers stay in order (1, 2, 3 -- \
+never renumber a step to make room for another text). Never drop a client text: a poster \
 missing its words is worse than any flaw. Slots never move.
 
 OUTPUT one JSON object: {"findings": [{"ops": ["o7"], "flaw": "...", "fix": "..."}], "patches": [{"id": "o6", "slots": \
@@ -492,6 +494,17 @@ look allows."""
 
 def _px(b) -> str:
     return f"{b[2] - b[0]:.0f}x{b[3] - b[1]:.0f}px"
+
+
+def _fits(w: float, m: dict, n: int = 4) -> list[str]:
+    """Font trong danh mục có độ rộng chữ gần nét nháp nhất (cùng nhóm: nét dày-mảnh -> serif / viết tay, còn lại sans) --
+    tên cụ thể từng dòng: con số độ rộng chung chung bị VLM bỏ qua (08/10: 70 lệnh bị co, font rộng hơn nét nháp 23%,
+    gần như toàn Montserrat -- font rộng nhất bộ)."""
+    from .fonts import CATALOG, WIDTH
+    cls = ("serif", "script") if (m.get("stroke_contrast") or 0) >= 2.2 else ("sans",)
+    col = 1 if m.get("caps") else 0
+    keys = [k for k in WIDTH if CATALOG[k][1] in cls and "Italic" not in CATALOG[k][0]]   # bản nghiêng: VLM tự chọn khi nháp nghiêng
+    return sorted(keys, key=lambda k: abs(WIDTH[k][col] - w))[:n]
 
 
 def _look(m: dict) -> str:
@@ -510,7 +523,8 @@ def _look(m: dict) -> str:
         # ĐỘ RỘNG CHỮ: rộng khung / (số ký tự x cỡ) -- so với độ rộng font ở danh mục (08/10: designer chọn font rộng hơn chữ nháp
         # -> phải co ~0.66, phần lớn lỗi too_small); OCR sai chữ nhưng số ký tự gần đúng
         w = (m["box"][2] - m["box"][0]) / (n * m["size"])
-        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else ""))
+        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else "")
+                   + f", fonts that wide: {', '.join(_fits(w, m))}")
     e = m.get("effect")
     if e:
         if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:
@@ -841,6 +855,17 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
         if r.get("fs"):
             row["rendered"] = {"drafted_px": round(float(np.median([m["size"] for m in Ls]))) if Ls else None,
                                "font_px": round(r["fs"]), "weight": r.get("fw"), "font": (r.get("ff") or "").split(",")[0].strip("'\" ")}
+            if r.get("shrink", 1) < 0.9 and len(Ls) == 1 and len(Ls[0].get("ocr") or "") >= 4:
+                # VÌ SAO nhỏ: font rộng hơn nét nháp (gợi ý font đúng độ rộng) hay chữ dài hơn chỗ nháp vẽ
+                from .fonts import WIDTH
+                from .render import font_key
+                L0 = Ls[0]
+                fk = font_key(row["rendered"]["font"])
+                dw = (L0["box"][2] - L0["box"][0]) / (len(L0["ocr"]) * L0["size"])
+                if fk in WIDTH:
+                    row["rendered"]["why_small"] = (f"font {WIDTH[fk][1 if L0.get('caps') else 0] / dw:.2f}x wider than the drafted "
+                                                    f"letters; same-width fonts: {', '.join(_fits(dw, L0))}; text "
+                                                    f"{len(_plain(op.get('html') or '')) / len(L0['ocr']):.2f}x the drafted length")
         rows.append(row)
     ch = [c for c in changes or [] if not c.startswith("--")]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
@@ -855,7 +880,9 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
         p = patches.pop(op["id"], None)
         if p is None:
             new.append(op)
-        elif not p.get("delete"):
+        elif p.get("delete"):   # xoá = không vẽ gì; ô vẫn đã quyết (skip), không thành "ô bỏ sót" (08/10 h08: cả lượt bị loại)
+            new.append({"id": op["id"], "kind": "skip", "marks": op.get("marks") or [], "why": "review: delete"})
+        else:
             q = {**op, **{k: v for k, v in p.items() if k not in ("id", "delete")}}
             if "slots" in p:
                 q["marks"] = list(p["slots"] or [])
@@ -863,12 +890,47 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     for pid, p in patches.items():   # lệnh MỚI (ô chưa quyết)
         if p.get("slots") and not p.get("delete"):
             new.append({**{k: v for k, v in p.items() if k != "delete"}, "marks": list(p["slots"])})
+    # ô bị lệnh khác lấy đi (gộp ô) thì bỏ khỏi lệnh cũ; lệnh cũ hết ô thì bỏ
+    regrab = {p.get("id") for p in out.get("patches") or [] if isinstance(p, dict) and p.get("slots")}   # lệnh vá có ô mới thắng
+    owner = {}
+    for op in sorted(new, key=lambda o: o["id"] not in regrab):
+        for m in op.get("marks") or []:
+            owner.setdefault(m, op["id"])
+    new = [{**op, "marks": [m for m in op.get("marks") or [] if owner.get(m) == op["id"]]} for op in new]
+    new = [op for op in new if op["marks"]]
     return _to_marks({**P, "ops": new, "review_why": out.get("why"), "review_findings": out.get("findings"),
                       "review_patches": len(out.get("patches") or [])})
 
 
 REVIEW_ROUNDS = 2   # dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
+
+
+def salvage(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> dict | None:
+    """Bản duyệt bị loại (accept = False) thường chỉ hỏng ở một hai lệnh, phần còn lại là sửa tốt (08/10 h08: xoá một huy hiệu
+    làm ô bỏ sót -> mất cả ba huy hiệu đã dựng lại đẹp). Hoàn lại ĐÚNG các lệnh gây lỗi nặng mới / làm mất câu khách về bản
+    trước, giữ các vá khác. None khi không có gì để cứu."""
+    key = lambda e: (e["type"], tuple(sorted(e.get("ops") or [])), tuple(sorted(e.get("slots") or [])))   # noqa: E731
+    seen = {key(e) for e in errs if e["type"] in SEVERE}
+    old = {o["id"]: o for o in P["ops"]}
+    bad = set()
+    for e in errs2:
+        if e["type"] in SEVERE and key(e) not in seen:
+            bad |= set(e.get("ops") or [])
+            bad |= {o["id"] for o in P["ops"] for s in e.get("slots") or [] if s in (o.get("marks") or [])}
+    told = lambda Q: {_tid(o.get("client")): o["id"] for o in Q["ops"] if o.get("kind") == "text" and o.get("html")}   # noqa: E731
+    lost = set(told(P)) - set(told(P2)) - {None}
+    bad |= {i for c, i in told(P).items() if c in lost}
+    if not bad:
+        return None
+    new = [old[o["id"]] if o["id"] in old and o["id"] in bad else o for o in P2["ops"] if o["id"] in old or o["id"] not in bad]
+    new += [old[i] for i in bad if i in old and i not in {o["id"] for o in new}]
+    owner = {}
+    for op in sorted(new, key=lambda o: o["id"] not in bad):   # lệnh hoàn lại lấy lại ô của nó
+        for m in op.get("marks") or []:
+            owner.setdefault(m, op["id"])
+    new = [{**op, "marks": [m for m in op.get("marks") or [] if owner.get(m) == op["id"]]} for op in new]
+    return {**P2, "ops": [op for op in new if op["marks"]], "salvaged": sorted(bad)}
 
 
 def accept(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> bool:

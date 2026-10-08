@@ -214,15 +214,24 @@ async (o) => {
     // đếm phía phải: p20 hàng sao thò ra ngoài huy hiệu bên trái)
     // KHUNG Ô ôm NÉT MỰC (cả dấu thanh), còn hộp chữ của trình duyệt = ascent + descent của font (đệm trên / dưới nét): so
     // thẳng thì mọi dòng "tràn dọc" và bị co ~0.6-0.8 (07/10: 80% lỗi too_small, chữ nhỏ / nhạt hơn nháp). Trừ phần đệm đó --
-    // đo bằng measureText trên chính chữ của khối, theo font của khối (tỉ lệ theo cỡ, đo một lần ở 100px).
+    // đo bằng measureText trên chính chữ của khối, theo font của PHẦN CHỮ CHIẾM NHIỀU NHẤT (i-font / span bên trong có font, cỡ
+    // riêng -- đo theo font của khung thì sai: 08/10 h02 khung Plus Jakarta, chữ Baloo dấu cao -> "tràn dọc" oan, co còn 0.6),
+    // tính theo đơn vị cỡ của khung (tỉ lệ theo cỡ, đo một lần ở 100px).
     const pad = (() => {
       const t = d.textContent.trim();
       if (!t) return {top: 0, bot: 0};
-      const cs = getComputedStyle(d), cx = document.createElement('canvas').getContext('2d');
+      let el = d, best = 0;
+      const w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const k = n.textContent.trim().length;
+        if (k > best) { best = k; el = n.parentElement; }
+      }
+      const cs = getComputedStyle(el), cx = document.createElement('canvas').getContext('2d');
+      const r = parseFloat(cs.fontSize) / (parseFloat(getComputedStyle(d).fontSize) || 1);
       cx.font = `${cs.fontStyle} ${cs.fontWeight} 100px ${cs.fontFamily}`;
       const mt = cx.measureText(t);
-      return {top: Math.max(0, mt.fontBoundingBoxAscent - mt.actualBoundingBoxAscent) / 100,
-              bot: Math.max(0, mt.fontBoundingBoxDescent - mt.actualBoundingBoxDescent) / 100};
+      return {top: r * Math.max(0, mt.fontBoundingBoxAscent - mt.actualBoundingBoxAscent) / 100,
+              bot: r * Math.max(0, mt.fontBoundingBoxDescent - mt.actualBoundingBoxDescent) / 100};
     })();
     const over = () => {
       const rr = document.createRange(); rr.selectNodeContents(d);
@@ -239,6 +248,9 @@ async (o) => {
       continue;
     }
     let s = e.size, k = 0, m = over();
+    const m0q = m.q, m0b = d.getBoundingClientRect(), fs0 = parseFloat(d.style.fontSize) || 0;   // tràn lúc CHƯA co: ngang / dọc
+    const o0 = [Math.max(0, m0b.left - m0q.left, m0q.right - m0b.right),
+                Math.max(0, m0b.top - m0q.top - pad.top * fs0, m0q.bottom - m0b.bottom - pad.bot * fs0)];
     if (e.fit !== 'grow' && e.fit !== 'none') {   // co nội dung cho vừa khung (em theo font-size của khung)
       while (m.v > 1 && s > o.floor && k < 80) { s *= 0.95; d.style.fontSize = s + 'px'; k++; m = over(); }
     }
@@ -254,7 +266,7 @@ async (o) => {
           cs.webkitBackgroundClip === 'text') fx = true;
       if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
     }
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, fg, fx, fs, ff, fw,
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw,
               ink: [q.left - R0.left, q.top - R0.top, q.right - R0.left, q.bottom - R0.top],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -323,6 +335,10 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         elif re.search(r"text-align\s*:\s*(right|end)", bs) and "justify-content" not in bs:
             bs += ";justify-content:flex-end"
         bs = (f"font-weight:{wt};" if wt else "") + bs
+        # ô MỘT dòng nháp, không <br>: không tự xuống dòng -- trình duyệt bẻ dòng khi chữ dài, chiều cao vượt ô, vòng co thu nhỏ
+        # tới khi 2 dòng li ti lọt ô (08/10: 59 / 78 lệnh bị co là "tràn dọc" kiểu này); một dòng co theo chiều ngang to hơn
+        if op.get("kind") == "text" and len(lm) == 1 and not re.search(r"<br", op.get("html") or "", flags=re.I):
+            bs = "white-space:nowrap;" + bs
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": op.get("fit") or "shrink", "angle": g["angle"], "icon": op.get("kind") == "icon" and bool(mk)
                     and all(m.startswith("I") for m in mk)})
@@ -338,6 +354,11 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     size0, fs = {e["id"]: e["size"] for e in els}, {r["id"]: r.get("fs") for r in res}
     by_el, by_res, changed = {e["id"]: e for e in els}, {r["id"]: r for r in res}, []
     for g in _role_groups(P, M, res):
+        # dòng nhỏ BẤT THƯỜNG (< 0.8 trung vị: chữ quá dài cho ô) không kéo cả nhóm -- để nó lại, too_small báo vòng duyệt rút gọn
+        med = float(np.median([fs[i] for i in g]))
+        g = [i for i in g if fs[i] >= 0.8 * med]
+        if len(g) < 2:
+            continue
         lo = min(fs[i] for i in g)
         for i in g:
             if fs[i] > lo * 1.03:
@@ -557,16 +578,20 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
         while par[x] != x:
             x = par[x]
         return x
-    for i, (ia, sa, ba) in enumerate(T):
-        for ib, sb, bb in T[i + 1:]:
-            s = max(sa, sb)
-            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.15 or (same_font and ff[ia] != ff[ib]):
-                continue
-            col = abs(ba[0] - bb[0]) <= 0.6 * s   # thẳng tâm thì không: tiêu đề / nút / chân trang xếp giữa là các vai khác nhau
-            row = abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * s
-            gap = max(ba[1] - bb[3], bb[1] - ba[3], 0)
-            if (col or row) and gap <= 3 * s:
-                par[root(ia)] = root(ib)
+    # CỘT trước (thẳng mép trái), rồi HÀNG chỉ giữa các dòng không thuộc cột nào: nối qua hàng thì cột tên món + cột giá thành
+    # một nhóm (08/10 h02: cả bảng co theo dòng dài nhất)
+    pairs = [(a, b) for i, a in enumerate(T) for b in T[i + 1:]
+             if max(a[1], b[1]) / max(1.0, min(a[1], b[1])) <= 1.15 and not (same_font and ff[a[0]] != ff[b[0]])]
+    gap = lambda ba, bb: max(ba[1] - bb[3], bb[1] - ba[3], 0)   # noqa: E731
+    in_col = set()
+    for (ia, sa, ba), (ib, sb, bb) in pairs:   # thẳng tâm thì không: tiêu đề / nút / chân trang xếp giữa là các vai khác nhau
+        if abs(ba[0] - bb[0]) <= 0.6 * max(sa, sb) and gap(ba, bb) <= 3 * max(sa, sb):
+            par[root(ia)] = root(ib)
+            in_col |= {ia, ib}
+    for (ia, sa, ba), (ib, sb, bb) in pairs:
+        if ia not in in_col and ib not in in_col and abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * max(sa, sb) and \
+                abs(ba[0] - bb[0]) <= 8 * max(sa, sb):
+            par[root(ia)] = root(ib)
     groups = {}
     for t in T:
         groups.setdefault(root(t[0]), []).append(t[0])

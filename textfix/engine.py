@@ -101,9 +101,17 @@ class Engine:
             poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
             errs2 = render.check(P2, M, res2)
             log += [f"-- vòng duyệt {k + 1} --", f"VLM: {P2.get('review_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
-            if not slots.accept(P, errs, P2, errs2):   # mất câu khách / thêm lỗi nặng
-                log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
-                break
+            if not slots.accept(P, errs, P2, errs2):   # mất câu khách / thêm lỗi nặng: hoàn lại đúng các lệnh gây hỏng
+                P3 = slots.salvage(P, errs, P2, errs2)
+                if P3 is not None:
+                    poster3, res3, rlog3 = render.render(self.browser.page, slots.base_image(draft, plate, M, P3), P3, M)
+                    errs3 = render.check(P3, M, res3)
+                    log.append(f"-> hoàn lại {P3['salvaged']}, giữ các vá khác")
+                    if slots.accept(P, errs, P3, errs3):
+                        P2, poster2, res2, errs2, rlog2 = P3, poster3, res3, errs3, rlog3
+                if P2 is not P3:
+                    log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
+                    break
             poster, P, errs, res, changes = poster2, P2, errs2, res2, vlog2 + rlog2
             log.append("-> giữ bản đã duyệt")
         T["duyet"] = time.time() - t0

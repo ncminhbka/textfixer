@@ -136,7 +136,15 @@ def main(argv: list[str] | None = None) -> int:
                     errs2 = render.check(P2, x["M"], res2)
                     rnd.update(why=P2.get("review_why"), findings=P2.get("review_findings"), errs=errs2, patches=P2.get("review_patches"))
                     st["rec"]["log"] += [f"-- vòng duyệt {r} --"] + vlog2 + rlog2
-                    if slots.accept(st["P"], st["errs"], P2, errs2):   # như engine
+                    if not slots.accept(st["P"], st["errs"], P2, errs2):   # như engine: hoàn lại đúng các lệnh gây hỏng
+                        P3 = slots.salvage(st["P"], st["errs"], P2, errs2)
+                        if P3 is not None:
+                            poster3, res3, rlog3 = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P3), P3, x["M"])
+                            errs3 = render.check(P3, x["M"], res3)
+                            rnd.update(salvaged=P3["salvaged"], errs_salvaged=errs3)
+                            if slots.accept(st["P"], st["errs"], P3, errs3):
+                                P2, poster2, res2, errs2, rlog2 = P3, poster3, res3, errs3, rlog3
+                    if slots.accept(st["P"], st["errs"], P2, errs2):
                         rnd["kept"] = True
                         st.update(P=P2, poster=poster2, errs=errs2, res=res2, changes=vlog2 + rlog2)
                         Image.fromarray(poster2).save(a.out / v / f"{k}_r{r}.jpg", quality=85)
