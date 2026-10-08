@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--only", default="")
     ap.add_argument("--workers", type=int, default=4, help="số lời gọi VLM song song")
     ap.add_argument("--fresh", action="store_true", help="bỏ qua cache VLM (gọi mới)")
-    ap.add_argument("--review", default=None, choices=["errors", "full"], help="chế độ vòng duyệt (mặc định slots.REVIEW_MODE)")
+    ap.add_argument("--review", default=None, choices=["errors", "full", "off"], help="chế độ vòng duyệt (mặc định slots.REVIEW_MODE)")
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "output" / "vlm_probe")
     ap.add_argument("--ship-only", action="store_true")
     ap.add_argument("--no-ship", action="store_true")

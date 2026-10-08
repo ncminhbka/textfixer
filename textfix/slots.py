@@ -913,6 +913,7 @@ REVIEW_ROUNDS = 2   # chế độ "full": dựng -> duyệt -> dựng -> duyệt
 # CHẾ ĐỘ (08/10, sau lượt 3-4: duyệt thẩm mỹ tốn ~20 s / poster, ~2 / 15 poster đẹp hơn, ~5 xấu đi -> không đáng):
 #   "errors" (mặc định) -- MỘT lượt, CHỈ khi lượt đầu có lỗi nặng (SEVERE), chỉ sửa đúng các lỗi đó (~1 / 3 poster)
 #   "full"   -- duyệt thẩm mỹ cả tấm, REVIEW_ROUNDS lượt, có giám khảo (slots.judge)
+#   "off"    -- không bao giờ gọi VLM lần hai (độ trễ cố định; lỗi nặng còn nguyên trên poster)
 REVIEW_MODE = os.environ.get("TEXTFIX_REVIEW", "errors")
 ONLY_ERRORS = """MODE: FIX ONLY THE ERRORS. Fix exactly the ERRORS listed and nothing else -- every op not involved in an error \
 stays untouched; no aesthetic changes. Output "findings" for the errors only."""
@@ -924,6 +925,8 @@ def review_rounds() -> int:
 
 def review_needed(errs: list[dict]) -> bool:
     """Có chạy vòng duyệt cho bản này không (theo REVIEW_MODE)."""
+    if REVIEW_MODE == "off":
+        return False
     return REVIEW_MODE == "full" or any(e["type"] in SEVERE for e in errs)
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
