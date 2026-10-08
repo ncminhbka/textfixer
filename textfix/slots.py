@@ -429,7 +429,9 @@ script font, a wide headline is never set in a condensed font (or the reverse). 
 the slot and gets shrunk, a narrower one looks lost in it.
 - Same role, same look: rows of one list / menu / table, the items of one card set, the labels of one badge set share ONE \
 font, size, weight and color -- write the same font-size on all of them (the smallest that fits), never one row big and the \
-next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up.
+next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up. \
+Give every op of such a set the same "group" name (e.g. "benefits", "menu-names", "menu-prices", "badges"): the renderer then \
+draws the whole group at one size, the size that fits its longest member.
 - More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
 may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons.
 - Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
@@ -440,7 +442,7 @@ shape, the text op gets NO background, border or box-shadow of its own.
 OUTPUT: one JSON object
 {"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
  "ops": [{"id": "o1", "slots": ["L1"], "kind": "text|keep|skip|shape|icon", "client": "T0" | null, "html": "...",
-          "box_style": "...", "why": "a few words"}],
+          "box_style": "...", "group": "name" | null, "why": "a few words"}],
  "missing": ["T5"], "notes": "..."}
 
 FONT CATALOG (key: family, class): {fonts}

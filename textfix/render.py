@@ -354,9 +354,10 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     size0, fs = {e["id"]: e["size"] for e in els}, {r["id"]: r.get("fs") for r in res}
     by_el, by_res, changed = {e["id"]: e for e in els}, {r["id"]: r for r in res}, []
     for g in _role_groups(P, M, res):
-        # dòng nhỏ BẤT THƯỜNG (< 0.8 trung vị: chữ quá dài cho ô) không kéo cả nhóm -- để nó lại, too_small báo vòng duyệt rút gọn
+        # dòng nhỏ BẤT THƯỜNG (< 0.65 trung vị: chữ quá dài cho ô) không kéo cả nhóm -- để nó lại, too_small báo vòng sửa rút gọn;
+        # 0.8 thì danh sách vẫn lệch (08/10 r01_s1: 33 / 33 / 33 / 23 px) -- danh sách ĐỀU quan trọng hơn to
         med = float(np.median([fs[i] for i in g]))
-        g = [i for i in g if fs[i] >= 0.8 * med]
+        g = [i for i in g if fs[i] >= 0.65 * med]
         if len(g) < 2:
             continue
         lo = min(fs[i] for i in g)
@@ -444,7 +445,8 @@ def _even_icons(els: list[dict]) -> list[str]:
             if s <= 0 or s / max(1.0, min(side(a), side(b))) > 1.6:
                 continue
             (ax, ay), (bx, by) = cen(a), cen(b)
-            if (abs(ax - bx) <= 0.6 * s and abs(ay - by) <= 4 * s) or (abs(ay - by) <= 0.4 * s and abs(ax - bx) <= 8 * s):
+            # cột đầu dòng của danh sách thưa: tâm cách nhau tới 6 cỡ icon (08/10 r01_s1: 4 tick, chỉ 2 được nối)
+            if (abs(ax - bx) <= 0.4 * s and abs(ay - by) <= 6 * s) or (abs(ay - by) <= 0.4 * s and abs(ax - bx) <= 8 * s):
                 par[root(i)] = root(j)
     groups, log = {}, []
     for i, e in enumerate(I):
@@ -585,6 +587,11 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
             continue
         b = [min(m["box"][0] for m in Ls), min(m["box"][1] for m in Ls), max(m["box"][2] for m in Ls), max(m["box"][3] for m in Ls)]
         T.append((op["id"], float(np.median([m["size"] for m in Ls])), b))
+    # DÒNG CÓ ĐẦU DÒNG (icon / tick ngay bên trái): nháp hay vẽ các mục một danh sách to nhỏ khác nhau (08/10 r01_s1: 34-38 so với
+    # 30-32 px) -> cỡ nháp không đủ để nhận cùng vai; hai dòng cùng có đầu dòng và thẳng mép trái là một danh sách dù lệch tới 40%
+    bul = {c["near"].split()[-1] for c in M.get("I") or [] if str(c.get("near") or "").startswith("left of")}
+    has_bul = {op["id"] for op in P["ops"] if any(m in bul for m in op.get("marks") or [])}
+    lim = lambda a, b: 1.4 if a[0] in has_bul and b[0] in has_bul else 1.15   # noqa: E731
     par = {t[0]: t[0] for t in T}
 
     def root(x):
@@ -594,13 +601,24 @@ def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[li
     # CỘT trước (thẳng mép trái), rồi HÀNG chỉ giữa các dòng không thuộc cột nào: nối qua hàng thì cột tên món + cột giá thành
     # một nhóm (08/10 h02: cả bảng co theo dòng dài nhất)
     pairs = [(a, b) for i, a in enumerate(T) for b in T[i + 1:]
-             if max(a[1], b[1]) / max(1.0, min(a[1], b[1])) <= 1.15 and not (same_font and ff[a[0]] != ff[b[0]])]
+             if max(a[1], b[1]) / max(1.0, min(a[1], b[1])) <= lim(a, b) and not (same_font and ff[a[0]] != ff[b[0]])]
     gap = lambda ba, bb: max(ba[1] - bb[3], bb[1] - ba[3], 0)   # noqa: E731
     in_col = set()
     for (ia, sa, ba), (ib, sb, bb) in pairs:   # thẳng tâm thì không: tiêu đề / nút / chân trang xếp giữa là các vai khác nhau
-        if abs(ba[0] - bb[0]) <= 0.6 * max(sa, sb) and gap(ba, bb) <= 3 * max(sa, sb):
+        far = 4 if ia in has_bul and ib in has_bul else 3   # danh sách thưa (mục cách xa nhau) vẫn là một danh sách
+        if abs(ba[0] - bb[0]) <= 0.6 * max(sa, sb) and gap(ba, bb) <= far * max(sa, sb):
             par[root(ia)] = root(ib)
             in_col |= {ia, ib}
+    # NHÓM DO VLM KHAI ("group" của lệnh: cùng vai theo nghĩa -- mục danh sách, tên món, giá...): gộp thẳng, không cần đoán
+    # (cùng font thì mới so được cỡ px)
+    grp = {}
+    for op in P["ops"]:
+        if op.get("group") and op["id"] in par:
+            grp.setdefault(str(op["group"]).strip().lower(), []).append(op["id"])
+    for ids in grp.values():
+        for b in ids[1:]:
+            if not (same_font and ff[ids[0]] != ff[b]):
+                par[root(ids[0])] = root(b)
     for (ia, sa, ba), (ib, sb, bb) in pairs:
         if ia not in in_col and ib not in in_col and abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * max(sa, sb) and \
                 abs(ba[0] - bb[0]) <= 8 * max(sa, sb):
