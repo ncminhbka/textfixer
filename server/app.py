@@ -165,6 +165,7 @@ DRAW_Q: "queue.Queue" = queue.Queue()
 DESIGN = ThreadPoolExecutor(max_workers=int(os.environ.get("TEXTFIX_DESIGN_WORKERS", "4")), thread_name_prefix="design")
 JOBRUN = ThreadPoolExecutor(max_workers=int(os.environ.get("TEXTFIX_JOB_WORKERS", "8")), thread_name_prefix="job")
 LOCAL = threading.local()   # Chromium của từng luồng thiết kế (Playwright đồng bộ: mỗi luồng một bản)
+LOAD_LOCK = threading.Lock()   # nạp FLUX từng card một (xem gpu_worker)
 
 
 def gpu_list() -> list[int]:
@@ -182,8 +183,13 @@ def gpu_worker(k: int, args, ready: threading.Event) -> None:
     from textfix.flux import Flux
     try:
         torch.cuda.set_device(k)
-        t0 = time.time()
-        F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=f"cuda:{k}").load()
+        # NẠP LẦN LƯỢT từng card: transformers đổi kiểu số mặc định của torch (toàn cục, không theo luồng) khi nạp bộ mã hoá
+        # chữ -> hai card nạp cùng lúc giẫm nhau, một bản lẫn float32 (08/10: cuda:0 21.5 GB so với 14.9 GB, mọi ảnh vẽ trên
+        # cuda:0 lỗi "float != BFloat16"). Vẽ thì vẫn song song.
+        with LOAD_LOCK:
+            t0 = time.time()
+            F = Flux(args.model, steps=args.steps, weights_dir=args.weights_dir, device=f"cuda:{k}").load()
+            F.check_dtypes()
         STATE["flux"].append(F)
         log.info("FLUX cuda:%d sẵn sàng (%.0fs, %.1f GB)", k, time.time() - t0, torch.cuda.memory_allocated(k) / 2 ** 30)
     except BaseException as e:   # gồm SystemExit của flux2.util khi thiếu trọng số

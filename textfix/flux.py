@@ -88,6 +88,19 @@ class Flux:
         self._unc = self._encode("") if self.cfg else None
         return self
 
+    def check_dtypes(self) -> list[str]:
+        """Mọi tham số DiT / bộ mã hoá chữ phải là bf16 (nạp đồng thời nhiều bản từng làm lẫn float32 -> "float != BFloat16"):
+        lệch thì ép về bf16 và báo."""
+        import torch
+        fixed = []
+        for name, mod in (("dit", self.dit), ("te", self.te)):
+            if mod is not None and any(p.dtype == torch.float32 for p in mod.parameters()):
+                mod.to(torch.bfloat16)
+                fixed.append(name)
+        if fixed:
+            print(f"[flux {self.dev_dit}] tham số float32 trong {fixed} -> ép bf16")
+        return fixed
+
     def info(self) -> dict:
         return {"variant": self.variant, "model": self.name, "steps": self.steps, "cfg": self.cfg, "weights": self.weights,
                 "devices": {"dit": self.dev_dit, "te": self.dev_te, "ae": self.dev_ae}}
