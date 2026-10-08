@@ -85,23 +85,28 @@ class Engine:
         errs = render.check(P, M, res)
         log += rlog + [f"LỖI: {e}" for e in errs]
         T["dung"] = time.time() - t0
-        if errs:
-            t0 = time.time()
-            self.progress("VLM sửa lỗi")
+        t0 = time.time()   # VÒNG DUYỆT: luôn chạy -- lỗi khách quan + lỗi thẩm mỹ VLM tự thấy trên bản dựng; tối đa REVIEW_ROUNDS
+        changes = log[:]   # code đã đổi gì trong quyết định của VLM (chặn chữ, căn cột, cân cỡ...) -- vòng duyệt phải biết
+        for k in range(slots.REVIEW_ROUNDS):
+            self.progress(f"VLM duyệt {k + 1}")
             try:
-                P2, vlog2 = slots.validate(slots.repair(draft, poster, M, P, errs, B["prompt_en"], B["texts"], self.vlm,
-                                                        product=product), M, B["texts"])
-                poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
-                errs2 = render.check(P2, M, res2)
-                log += ["-- vòng sửa lỗi --", f"VLM: {P2.get('repair_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
-                if slots.score(P2, errs2) < slots.score(P, errs):   # đủ câu khách, rồi ít lỗi, rồi ít chồng
-                    poster, P, errs = poster2, P2, errs2
-                    log.append("-> giữ bản đã sửa")
-                else:
-                    log.append("-> bản sửa không tốt hơn, giữ bản lượt đầu")
-            except Exception as e:   # vòng sửa hỏng (VLM trả sai, quá giờ): giữ bản lượt đầu
-                log.append(f"vòng sửa lỗi hỏng: {type(e).__name__}: {str(e)[:200]}")
-            T["sua"] = time.time() - t0
+                P2, vlog2 = slots.validate(slots.review(draft, poster, M, P, errs, res, B["prompt_en"], B["texts"], self.vlm,
+                                                        product=product, changes=changes), M, B["texts"])
+            except Exception as e:   # vòng duyệt hỏng (VLM trả sai, quá giờ): giữ bản đang có
+                log.append(f"vòng duyệt {k + 1} hỏng: {type(e).__name__}: {str(e)[:200]}")
+                break
+            if not P2.get("review_patches"):
+                log.append(f"vòng duyệt {k + 1}: không sửa gì ({P2.get('review_why')})")
+                break
+            poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
+            errs2 = render.check(P2, M, res2)
+            log += [f"-- vòng duyệt {k + 1} --", f"VLM: {P2.get('review_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
+            if not slots.accept(P, errs, P2, errs2):   # mất câu khách / thêm lỗi nặng
+                log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
+                break
+            poster, P, errs, res, changes = poster2, P2, errs2, res2, vlog2 + rlog2
+            log.append("-> giữ bản đã duyệt")
+        T["duyet"] = time.time() - t0
         tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
         missing = [B["texts"][i]["text"] for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
         plan = {"style": P.get("style"), "ops": P["ops"], "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,

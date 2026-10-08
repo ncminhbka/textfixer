@@ -246,15 +246,15 @@ async (o) => {
     if (e.angle) { d.style.transformOrigin = '50% 50%'; d.style.transform = `rotate(${e.angle}deg)`; m = over(); m.v = m0; }
     const q = m.q, b = d.getBoundingClientRect();
     // MÀU CHỮ thật (màu tính được của phần tử chứa nhiều chữ nhất) + có hiệu ứng tách nền không (bóng / viền / chữ tô gradient)
-    let fg = null, fx = false, best = 0, fs = null, ff = null;
+    let fg = null, fx = false, best = 0, fs = null, ff = null, fw = null;
     const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
     for (let t = tw.nextNode(); t; t = tw.nextNode()) {
       const n = t.textContent.trim().length, cs = getComputedStyle(t.parentElement);
       if (cs.textShadow !== 'none' || parseFloat(cs.webkitTextStrokeWidth) > 0 || cs.backgroundClip === 'text' ||
           cs.webkitBackgroundClip === 'text') fx = true;
-      if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; }
+      if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
     }
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, fg, fx, fs, ff,
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, fg, fx, fs, ff, fw,
               ink: [q.left - R0.left, q.top - R0.top, q.right - R0.left, q.bottom - R0.top],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -300,11 +300,23 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         fam = dfont if med and Ls and size >= HEAD * med else tfont
         st_w = [m["stroke"] / m["size"] for m in Ls if m.get("stroke") and m.get("size")]
         wt = WEIGHT(float(np.median(st_w))) if st_w else None
+        # chữ là TOÀN BỘ nội dung một vỏ (pill / nút một dòng): căn giữa dọc theo vỏ -- khung dòng nắn theo nét (dấu thanh, mép
+        # sáng của vỏ) lệch lên, chữ căn giữa khung dòng trông "nảy lên" khỏi tâm vỏ (08/10 m03)
+        lm = {m for m in mk if m.startswith("L")}
+        sh = next((s for s in M.get("S") or [] if lm and set(s.get("lines") or []) == lm and not s.get("icons")), None)
+        if sh and op.get("kind") == "text" and not g["angle"]:
+            cy, hh = (sh["box"][1] + sh["box"][3]) / 2, min(b[3] - b[1], 0.9 * (sh["box"][3] - sh["box"][1]))
+            b = [b[0], cy - hh / 2, b[2], cy + hh / 2]
+        # font-size ghi ở box_style = CỠ GỐC của khung (để nguyên px thì nó đè cỡ khung: vòng co nhảy cỡ, cân cỡ cùng vai hỏng)
+        bs_raw = op.get("box_style") or ""
+        fsz = re.search(r"(?<![-\w])font-size\s*:\s*(\d+(?:\.\d+)?)px\s*;?", bs_raw)
+        if fsz and not (mk and all(m.startswith("I") for m in mk)):
+            size, bs_raw = float(fsz.group(1)), bs_raw.replace(fsz.group(0), "")
         # VLM ghi cỡ bằng px poster (đọc thẳng từ số đo dòng / khung); đổi sang em theo cỡ khung để vòng co vẫn co đều mọi thứ
         html = re.sub(r"(\d+(?:\.\d+)?)px\b", lambda m: f"{float(m.group(1)) / max(size, 1.0):.4f}em", op.get("html") or "")
         h, lg = expand(html, icons, used)
         log += [f"{op['id']}: {x}" for x in lg]
-        bs, lg = expand(op.get("box_style") or "", icons, used)
+        bs, lg = expand(bs_raw, icons, used)
         log += [f"{op['id']}: {x}" for x in lg]
         if re.search(r"text-align\s*:\s*(left|start)", bs) and "justify-content" not in bs:   # căn trái mà khối vẫn ở giữa ô
             bs += ";justify-content:flex-start"
@@ -312,13 +324,32 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             bs += ";justify-content:flex-end"
         bs = (f"font-weight:{wt};" if wt else "") + bs
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
-                    "fit": op.get("fit") or "shrink", "angle": g["angle"]})
-    log += _align_left(els)
+                    "fit": op.get("fit") or "shrink", "angle": g["angle"], "icon": op.get("kind") == "icon" and bool(mk)
+                    and all(m.startswith("I") for m in mk)})
+    log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
-    page.set_content(f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
-                     f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
-                     f"</style></head><body><div id=c></div></body></html>")
+    html = (f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
+            f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
+            f"</style></head><body><div id=c></div></body></html>")
+    page.set_content(html)
     res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H)})
+    # CÙNG VAI CÙNG CỠ: mỗi dòng tự co cho vừa ô của nó -> các mục một danh sách lệch cỡ (08/10 r01: 20 / 24 / 24 / 19px). Dựng
+    # lại cả nhóm ở cỡ nhỏ nhất của nhóm (nhỏ hơn thì chắc chắn vừa ô, không co thêm)
+    size0, fs = {e["id"]: e["size"] for e in els}, {r["id"]: r.get("fs") for r in res}
+    by_el, by_res, changed = {e["id"]: e for e in els}, {r["id"]: r for r in res}, []
+    for g in _role_groups(P, M, res):
+        lo = min(fs[i] for i in g)
+        for i in g:
+            if fs[i] > lo * 1.03:
+                by_el[i]["size"], by_el[i]["fit"] = by_res[i]["size"] * lo / fs[i], "none"
+                changed.append(i)
+    if changed:
+        log.append(f"cùng vai cùng cỡ: dựng lại {changed}")
+        page.set_content(html)
+        res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H)})
+        for r in res:
+            r["shrink"] = r["size"] / size0[r["id"]] if size0.get(r["id"]) else 1
+            r["evened"] = r["id"] in changed   # nhỏ đi vì theo dòng nhỏ nhất nhóm: lỗi too_small chỉ tính ở dòng đó
     for r in res:
         if r["shrink"] < 0.7:
             log.append(f"{r['id']}: co còn {r['shrink']:.2f} để vừa khung")
@@ -357,6 +388,43 @@ def _low_contrast(r: dict, bg: np.ndarray) -> float | None:
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
     ratio = (np.maximum(lf, lb) + 0.05) / (np.minimum(lf, lb) + 0.05)
     return round(float((ratio < CONTRAST_PX).mean()), 2)
+
+
+def _even_icons(els: list[dict]) -> list[str]:
+    """Icon cùng hàng / cùng cột (đầu dòng một danh sách, hàng icon liên hệ): khung đo từng icon trên nháp to nhỏ khác nhau ->
+    dựng ra icon lệch cỡ (08/10 r05, r01). Icon cỡ gần nhau (<= 1.6 lần), thẳng tâm cột / hàng, cách nhau <= 3 cỡ = một nhóm:
+    mọi icon = ô vuông cạnh trung vị, giữ tâm của nó."""
+    I = [e for e in els if e.get("icon") and not e["angle"]]
+    side = lambda e: min(e["box"][2] - e["box"][0], e["box"][3] - e["box"][1])   # noqa: E731
+    cen = lambda e: ((e["box"][0] + e["box"][2]) / 2, (e["box"][1] + e["box"][3]) / 2)   # noqa: E731
+    par = list(range(len(I)))
+
+    def root(i):
+        while par[i] != i:
+            i = par[i]
+        return i
+    for i, a in enumerate(I):
+        for j in range(i + 1, len(I)):
+            b = I[j]
+            s = max(side(a), side(b))
+            if s <= 0 or s / max(1.0, min(side(a), side(b))) > 1.6:
+                continue
+            (ax, ay), (bx, by) = cen(a), cen(b)
+            if (abs(ax - bx) <= 0.6 * s and abs(ay - by) <= 4 * s) or (abs(ay - by) <= 0.4 * s and abs(ax - bx) <= 8 * s):
+                par[root(i)] = root(j)
+    groups, log = {}, []
+    for i, e in enumerate(I):
+        groups.setdefault(root(i), []).append(e)
+    for g in groups.values():
+        if len(g) < 2:
+            continue
+        m = float(np.median([side(e) for e in g]))
+        for e in g:
+            cx, cy = cen(e)
+            e["box"] = [cx - m / 2, cy - m / 2, cx + m / 2, cy + m / 2]
+            e["size"] = m
+        log.append(f"icon cùng cỡ {[e['id'] for e in g]}: {m:.0f}px")
+    return log
 
 
 def _align_left(els: list[dict]) -> list[str]:
@@ -447,7 +515,7 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
                 errs.append({"type": "content_overlap", "ops": [a["id"], b["id"]], "frac": round(_ov(a["ink"], b["ink"]), 2)})
         if a["over"] > 1 and boxes.get(a["id"]):
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
-        elif shrink_min and a.get("shrink", 1) < shrink_min:   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
+        elif shrink_min and a.get("shrink", 1) < shrink_min and not a.get("evened"):   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
             errs.append({"type": "too_small", "ops": [a["id"]], "shrink": round(a["shrink"], 2)})
         if (a.get("low") or 0) > CONTRAST_FRAC and not a.get("fx"):   # chữ chìm vào nền thật sau nó
             errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
@@ -459,8 +527,21 @@ UNEVEN = 1.25   # cùng cụm (model vẽ cùng cỡ, thẳng cột / cùng hàn
 
 
 def _uneven(P: dict, M: dict, res: list) -> list[dict]:
-    """Các dòng cùng vai (model vẽ cùng cỡ +-15%, cùng font, thẳng MÉP TRÁI hoặc cùng hàng, cách nhau <= 3 cỡ) phải dựng cùng cỡ
-    (08/10 r01: các mục của một danh sách cỡ lệch nhau ~2 lần vì mỗi lệnh tự co / tự ghi cỡ)."""
+    """Nhóm cùng vai (_role_groups) vẫn lệch cỡ > 25% / độ đậm >= 200 sau khi render đã cân cỡ."""
+    fs = {r["id"]: r["fs"] for r in res if r.get("fs")}
+    fw = {r["id"]: r.get("fw") or 400 for r in res}
+    out = []
+    for g in _role_groups(P, M, res):
+        sz, wt = [fs[i] for i in g], [fw[i] for i in g]
+        # cỡ lệch > 25%, hoặc độ đậm lệch >= 200 (08/10 r01: cùng danh sách mục đậm mục nhạt)
+        if max(sz) / max(1.0, min(sz)) > UNEVEN or max(wt) - min(wt) >= 200:
+            out.append({"type": "uneven_size", "ops": g, "sizes": {i: round(fs[i]) for i in g}, "weights": {i: fw[i] for i in g}})
+    return out
+
+
+def _role_groups(P: dict, M: dict, res: list, same_font: bool = True) -> list[list[str]]:
+    """Các dòng cùng vai: model vẽ cùng cỡ +-15%, thẳng MÉP TRÁI hoặc cùng hàng, cách nhau <= 3 cỡ (+ cùng font khi same_font:
+    cỡ px chỉ so được trong cùng font) -> nhóm id lệnh (>= 2)."""
     fs = {r["id"]: r["fs"] for r in res if r.get("fs")}
     ff = {r["id"]: r.get("ff") for r in res}   # khác font thì cỡ px không so được (chữ viết tay cần cỡ khác chữ in)
     T = []
@@ -479,7 +560,7 @@ def _uneven(P: dict, M: dict, res: list) -> list[dict]:
     for i, (ia, sa, ba) in enumerate(T):
         for ib, sb, bb in T[i + 1:]:
             s = max(sa, sb)
-            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.15 or ff[ia] != ff[ib]:
+            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.15 or (same_font and ff[ia] != ff[ib]):
                 continue
             col = abs(ba[0] - bb[0]) <= 0.6 * s   # thẳng tâm thì không: tiêu đề / nút / chân trang xếp giữa là các vai khác nhau
             row = abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * s
@@ -489,12 +570,7 @@ def _uneven(P: dict, M: dict, res: list) -> list[dict]:
     groups = {}
     for t in T:
         groups.setdefault(root(t[0]), []).append(t[0])
-    out = []
-    for g in groups.values():
-        sz = [fs[i] for i in g]
-        if len(g) >= 2 and max(sz) / max(1.0, min(sz)) > UNEVEN:
-            out.append({"type": "uneven_size", "ops": g, "sizes": {i: round(fs[i]) for i in g}})
-    return out
+    return [g for g in groups.values() if len(g) >= 2]
 
 
 KIND_COL = {"text": (230, 30, 30), "icon": (30, 120, 230), "stars": (240, 170, 0), "shape": (160, 40, 200), "group": (160, 40, 200),

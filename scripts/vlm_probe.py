@@ -8,7 +8,8 @@ tách ô, system prompt, dựng, kiểm, vòng sửa giữ nguyên như engine.
   %run scripts/vlm_probe.py --split test             # CHỈ khi chốt (bench/slots_gt/split.json)
   %run scripts/vlm_probe.py --ship-only
 
-Ra output/vlm_probe/<cấu hình>/<key>.jpg (poster), <key>.json (lệnh, lỗi lượt đầu / sau sửa, câu thiếu, nhật ký, token, giây),
+Ra output/vlm_probe/<cấu hình>/<key>.jpg (poster cuối), <key>_r0.jpg (lượt đầu), <key>_r1/_r2.jpg (sau từng lượt duyệt được giữ),
+<key>.json (lệnh, lỗi lượt đầu / cuối, từng lượt duyệt: thấy gì / sửa gì, câu thiếu, nhật ký, token, giây),
 summary.json. Lời gọi VLM chạy song song (--workers), dựng Chromium tuần tự. Kết quả VLM có cache (~/.cache/textfix/designer):
 chạy lại không gọi lại; --fresh để gọi mới (đo độ dao động).
 Chấm ở máy cá nhân: python scripts/vlm_eval.py.
@@ -92,65 +93,70 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as e:
                 return job, None, mt, f"{type(e).__name__}: {str(e)[:300]}", time.time() - t0
 
-        def repair(item):
-            (v, k), P, poster, errs = item
+        def review(item):
+            (v, k), st = item
             x, mt = D[k], {}
             try:
-                P2 = slots.repair(x["draft"], poster, x["M"], P, errs, x["prompt"], x["texts"], vlm, product=x["product"], meta=mt)
+                P2 = slots.review(x["draft"], st["poster"], x["M"], st["P"], st["errs"], st["res"], x["prompt"], x["texts"], vlm,
+                                  product=x["product"], meta=mt, changes=st["changes"])
                 return (v, k), P2, mt, None
             except Exception as e:
                 return (v, k), None, mt, f"{type(e).__name__}: {str(e)[:300]}"
 
         with Browser() as B, ThreadPoolExecutor(a.workers) as ex:
-            first, todo_fix = {}, []
+            S = {}   # (v, k) -> trạng thái hiện tại {rec, P, poster, errs, res, changes, live}
             # 2. lập lệnh (song song) -> 3. dựng + kiểm (tuần tự)
             for (v, k), P, mt, err, dt in ex.map(plan, jobs):
-                rec = {"view": v, "key": k, "plan_meta": {**mt, "wall_s": round(dt, 1)}, "error": err}
+                rec = {"view": v, "key": k, "plan_meta": {**mt, "wall_s": round(dt, 1)}, "error": err, "rounds": []}
                 if P is None:
                     print(f"{v} {k}: LỖI VLM {err}")
-                    first[(v, k)] = (rec, None, None, None)
+                    S[(v, k)] = {"rec": rec, "P": None, "live": False}
                     continue
                 x = D[k]
                 P, vlog = slots.validate(P, x["M"], x["texts"])
                 poster, res, rlog = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P), P, x["M"])
                 errs = render.check(P, x["M"], res)
                 rec.update(errs_first=errs, log=vlog + rlog)
-                first[(v, k)] = (rec, P, poster, errs)
-                if errs:
-                    todo_fix.append(((v, k), P, poster, errs))
-            # 4. vòng sửa (song song) -> dựng lại, giữ bản ít lỗi hơn
-            fixed = {}
-            for (v, k), P2, mt, err in ex.map(repair, todo_fix):
-                fixed[(v, k)] = (P2, mt, err)
-            for (v, k), (rec, P, poster, errs) in first.items():
-                if P is None:
-                    out_P, out_poster, out_errs = None, None, None
-                else:
-                    out_P, out_poster, out_errs = P, poster, errs
-                    if (v, k) in fixed:
-                        P2, mt, err = fixed[(v, k)]
-                        rec["repair_meta"], rec["repair_error"] = mt, err
-                        if P2 is not None:
-                            x = D[k]
-                            P2, vlog2 = slots.validate(P2, x["M"], x["texts"])
-                            poster2, res2, rlog2 = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P2), P2, x["M"])
-                            errs2 = render.check(P2, x["M"], res2)
-                            rec["errs_repair"] = errs2
-                            rec["log"] += ["-- vòng sửa --"] + vlog2 + rlog2
-                            if slots.score(P2, errs2) < slots.score(P, errs):   # như engine
-                                out_P, out_poster, out_errs = P2, poster2, errs2
-                                rec["kept"] = "repair"
+                S[(v, k)] = {"rec": rec, "P": P, "poster": poster, "errs": errs, "res": res, "changes": vlog + rlog, "live": True}
+                (a.out / v).mkdir(exist_ok=True)   # bản lượt đầu để so trước / sau duyệt
+                Image.fromarray(poster).save(a.out / v / f"{k}_r0.jpg", quality=85)
+            # 4. vòng duyệt (song song mỗi lượt) -> dựng lại, giữ nếu không mất câu khách / không thêm lỗi nặng (slots.accept)
+            for r in range(1, slots.REVIEW_ROUNDS + 1):
+                live = [(key, st) for key, st in S.items() if st["live"]]
+                for (v, k), P2, mt, err in ex.map(review, live):
+                    st, x = S[(v, k)], D[k]
+                    rnd = {"round": r, "meta": mt, "error": err}
+                    st["rec"]["rounds"].append(rnd)
+                    if P2 is None or not P2.get("review_patches"):
+                        rnd["why"] = (P2 or {}).get("review_why")
+                        st["live"] = False
+                        continue
+                    P2, vlog2 = slots.validate(P2, x["M"], x["texts"])
+                    poster2, res2, rlog2 = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P2), P2, x["M"])
+                    errs2 = render.check(P2, x["M"], res2)
+                    rnd.update(why=P2.get("review_why"), findings=P2.get("review_findings"), errs=errs2, patches=P2.get("review_patches"))
+                    st["rec"]["log"] += [f"-- vòng duyệt {r} --"] + vlog2 + rlog2
+                    if slots.accept(st["P"], st["errs"], P2, errs2):   # như engine
+                        rnd["kept"] = True
+                        st.update(P=P2, poster=poster2, errs=errs2, res=res2, changes=vlog2 + rlog2)
+                        Image.fromarray(poster2).save(a.out / v / f"{k}_r{r}.jpg", quality=85)
+                    else:
+                        rnd["kept"] = False
+                        st["live"] = False
+            for (v, k), st in S.items():
+                rec, out_P = st["rec"], st["P"]
                 (a.out / v).mkdir(exist_ok=True)
-                if out_poster is not None:
-                    Image.fromarray(out_poster).save(a.out / v / f"{k}.jpg", quality=85)
+                if out_P is not None:
+                    Image.fromarray(st["poster"]).save(a.out / v / f"{k}.jpg", quality=85)
                 tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731
                 texts = D[k]["texts"]
-                rec.update(errs_final=out_errs, style=(out_P or {}).get("style"), ops=(out_P or {}).get("ops"),
+                rec.update(errs_final=st.get("errs"), style=(out_P or {}).get("style"), ops=(out_P or {}).get("ops"),
+                           kept=sum(1 for x in rec["rounds"] if x.get("kept")),
                            missing=[texts[i]["text"] for i in map(tid, (out_P or {}).get("missing") or [])
                                     if isinstance(i, int) and 0 <= i < len(texts)],
                            slots=slots.public(D[k]["M"]))
                 (a.out / v / f"{k}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-                print(f"{v} {k}: lỗi {len(rec.get('errs_first') or [])} -> {len(out_errs or [])}; "
+                print(f"{v} {k}: lỗi {len(rec.get('errs_first') or [])} -> {len(st.get('errs') or [])}, giữ {rec['kept']} lượt duyệt; "
                       f"token {rec['plan_meta'].get('prompt_tokens')}+{rec['plan_meta'].get('completion_tokens')}, "
                       f"{rec['plan_meta'].get('s')}s")
     # tổng hợp nhanh

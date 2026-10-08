@@ -23,7 +23,6 @@ X_EM = 0.53          # cao chữ thường (x-height) / em
 SNAP_SIDE = 0.35     # nắn khung dòng: xét lớp phủ quanh đa giác OCR, nới ngang / xuống 0.35 cao dòng ...
 SNAP_UP = 0.9        # ... và lên 0.9 cao dòng (dấu thanh / mũ tiếng Việt)
 INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
-REPAIR_MAX = 6       # vòng sửa: tối đa 6 lỗi có ảnh (2 ảnh / lỗi) -- máy chủ VLM giới hạn số ảnh mỗi lời gọi
 GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
                      # OCR gộp "địa chỉ [icon] website" ở chân trang thành một dòng)
 GAP_MIN = 0.4        # khoảng không nét quanh chỗ OCR chèn dấu cách kép: >= 0.4 cao dòng (khoảng cách từ thường ~0.3)
@@ -447,22 +446,48 @@ FONT CATALOG (key: family, class): {fonts}
 
 LUCIDE ICON NAMES: {icons}"""
 
-REPAIR = """You are the same designer. The renderer drew your ops and its checker found mechanical ERRORS (listed below): slots \
-no op covers (unassigned -- decide them: text / icon / shape / keep / skip), content of two ops overlaps, content overflows its \
-slot, or content had to be shrunk a lot to fit (too_small: you wrote more text than the slot holds -- shorten it, keep facts \
-exact, or merge it with the next line of the same block). For each error you get the involved ops / slots (JSON) and two zoomed \
-crops: the PROOF (rendered; each involved op outlined with its id) and the MARKED draft. Also: low_contrast (the text color \
-nearly matches what is really behind it -- pick a palette color with strong contrast, or add a text-shadow / outline, or \
-recreate the shell the draft had), uneven_size (lines of one role rendered at different sizes, "sizes" in px -- give them \
-all the same font-size, the smallest that fits, and the same font / weight). Never fix too_small by only lowering the \
-font-size: shorten the text or merge lines (a narrower font of the same style also helps). Never skip or delete a client \
-text (headline, price, phone...) to make an error go away -- a poster missing its words is worse than any error. Fix ONLY \
-these errors. Slots never move: you change text, merging of \
-consecutive lines, html, box_style.
+REVIEW = """You are the same designer, now the ART DIRECTOR reviewing the rendered poster before it goes to the client. Your first pass \
+was a plan made without seeing the result; now you SEE it. Use that: judge the PROOF with your eyes, not the plan.
 
-OUTPUT one JSON object: {"patches": [{"id": "o6", "slots": [...], "kind": "...", "html": "...", "box_style": "...", "client": ...,
-"delete": false}], "why": "..."} -- a patch lists only the fields it changes; "delete": true removes that op; a patch with a NEW id
-(e.g. "n1") and its slots adds a new op (use it for unassigned slots)."""
+You get: the DRAFT (the look to reach), the PROOF (exactly what the client will see), PROOF-IDS (the same with every op's \
+box and id), COMPARE crops (draft left, proof right, enlarged, for the busy areas), the rendered ops (what each wrote; \
+drafted size -> rendered font size, weight, font), the CODE CHANGES (what the engine changed in your plan on its own, see \
+below) and the ERRORS a checker measured.
+
+CODE CHANGES are deliberate and must not be undone: diacritics corrected to the client's spelling, duplicate lines skipped, \
+invented words removed, cut-short client texts restored, font keys mapped, left edges of a column aligned, icons of one row \
+/ column set to one size, lines of one role set to the size of the smallest one. When a change made something look worse (a \
+whole list became small because one row was long), fix the cause (shorten or rebreak that row, use a narrower font for the \
+role) -- do not reverse the change.
+
+Look at the PROOF as a whole and then area by area against the DRAFT, and write down every flaw a careful designer would not \
+ship. Typical flaws:
+- an orphan: a price with no item on its row, a bullet / icon / number with no text, a lone word;
+- an empty or under-filled shell: a badge, coin, pill, button or card the draft filled with big text that now holds tiny \
+text or nothing;
+- text not centred in its shell, or touching its edge;
+- one role in different sizes, weights, colors or fonts (list rows, prices, card titles, badge labels);
+- icons of one set in different sizes or styles;
+- text that is hard to read on what is behind it;
+- style that drifted from the draft: font family and width, weight, case, italic, effects, colors;
+- awkward line breaks, crowding, text much smaller than the draft drew it.
+Then fix each flaw with patches, and also every ERROR.
+
+Your tools (you may use any of them):
+- rewrite html / box_style of an op: font, weight, size, color, effects, line breaks, letter-spacing, padding, alignment;
+- MERGE slots: one op over several slots (e.g. all lines of a coin or badge in one op, the key word or number big on its own \
+line) -- the op is drawn over the union of its slots;
+- move a client text to a better slot, split one over two slots, or give a slot to another op;
+- turn a slot into a shape (recreate a lost pill / band behind text), an icon, keep or skip;
+- delete an orphan or junk op that carries no client text.
+Change only what is wrong -- ops that look right stay untouched. Facts stay exact. Never drop a client text: a poster \
+missing its words is worse than any flaw. Slots never move.
+
+OUTPUT one JSON object: {"findings": [{"ops": ["o7"], "flaw": "...", "fix": "..."}], "patches": [{"id": "o6", "slots": \
+[...], "kind": "...", "html": "...", "box_style": "...", "client": ..., "delete": false}], "why": "..."} -- findings first \
+(what you see), then one patch per fix; a patch lists only the fields it changes; "delete": true removes that op; a patch \
+with a NEW id (e.g. "n1") and its slots adds a new op. Empty "patches" only when the PROOF is already as good as the draft's \
+look allows."""
 
 
 def _px(b) -> str:
@@ -571,10 +596,18 @@ def _quarters(mk) -> list[bytes]:
 
 
 def _clusters(mk, M: dict, n_max: int = 4, side: int = 1024) -> list[bytes]:
-    """Vùng cắt quanh CỤM ô (khung ô nới 4% cạnh ngắn chạm nhau = một cụm; gộp cụm gần nhất tới <= n_max), phóng cạnh dài
-    = side: chỗ có ô được phóng, chỗ chỉ có ảnh thì không."""
+    """Vùng cắt quanh CỤM ô, phóng cạnh dài = side: chỗ có ô được phóng, chỗ chỉ có ảnh thì không."""
     from PIL import Image
-    W, H = mk.size
+    out = []
+    for b in _cluster_boxes(M, *mk.size, n_max=n_max):
+        c = mk.crop(b)
+        z = side / max(c.size)
+        out.append(_png(c.resize((max(1, int(c.width * z)), max(1, int(c.height * z))), Image.LANCZOS)))
+    return out
+
+
+def _cluster_boxes(M: dict, W: int, H: int, n_max: int = 4) -> list[list[int]]:
+    """CỤM ô: khung ô nới 4% cạnh ngắn chạm nhau = một cụm; gộp cặp cụm làm tăng diện tích ít nhất tới <= n_max."""
     pad = 0.04 * min(W, H)
     boxes = [[b["box"][0] - pad, b["box"][1] - pad, b["box"][2] + pad, b["box"][3] + pad] for b in M["L"] + M["S"] + M["I"]]
     if not boxes:
@@ -598,13 +631,7 @@ def _clusters(mk, M: dict, n_max: int = 4, side: int = 1024) -> list[bytes]:
         i, j = min(((i, j) for i in range(len(cl)) for j in range(i + 1, len(cl))),
                    key=lambda ij: area(un(cl[ij[0]], cl[ij[1]])) - area(cl[ij[0]]) - area(cl[ij[1]]))
         cl[i] = un(cl[i], cl.pop(j))
-    out = []
-    for b in sorted(cl, key=lambda b: (b[1], b[0])):
-        b = [max(0, int(b[0])), max(0, int(b[1])), min(W, int(b[2])), min(H, int(b[3]))]
-        c = mk.crop(b)
-        z = side / max(c.size)
-        out.append(_png(c.resize((max(1, int(c.width * z)), max(1, int(c.height * z))), Image.LANCZOS)))
-    return out
+    return [[max(0, int(b[0])), max(0, int(b[1])), min(W, int(b[2])), min(H, int(b[3]))] for b in sorted(cl, key=lambda b: (b[1], b[0]))]
 
 
 def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, product: bool = False, base: np.ndarray | None = None,
@@ -764,44 +791,65 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
     return out, log
 
 
-def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], prompt: str, texts: list[dict], call,
-           product: bool = False, meta: dict | None = None) -> dict:
-    """Vòng sửa (chỉ khi render.check báo lỗi): một lượt VLM, gửi các lệnh / ô lỗi + ảnh phóng vùng lỗi (bản dựng có khung lệnh,
-    nháp đánh dấu) -> P mới: vá đúng các lệnh đó, thêm lệnh cho ô chưa quyết; các lệnh khác giữ nguyên."""
-    from PIL import Image, ImageDraw
-    from .render import op_box
-    by_id = {op["id"]: op for op in P["ops"]}
-    mk = marked_image(draft, M)
-    H, W = draft.shape[:2]
-    cols = [(230, 30, 30), (30, 110, 230), (20, 160, 60), (200, 120, 0)]
-    order = sorted(errs, key=lambda e: e["type"] != "unassigned")   # ô chưa quyết trước: mất chữ là lỗi nặng nhất
-    parts, ids, n_img = [], [], 0
-    for k, e in enumerate(order):
-        boxes = [(i, op_box(by_id[i], M)) for i in e.get("ops") or [] if i in by_id]
-        boxes += [(s, M["by"][s]["box"]) for s in e.get("slots") or [] if s in M["by"]]
-        boxes = [(i, b) for i, b in boxes if b]
-        parts.append(f"ERROR {k + 1}: {json.dumps(e, ensure_ascii=False)}")
-        ids += [i for i in e.get("ops") or [] if i in by_id]
-        if not boxes or n_img >= REPAIR_MAX:
+def _ids_image(proof: np.ndarray, M: dict, P: dict):
+    """Bản dựng + khung và id từng lệnh vẽ (màu theo loại) -- để VLM trỏ đúng lệnh khi duyệt."""
+    from PIL import Image, ImageDraw, ImageFont
+    from .render import KIND_COL, op_box
+    im = Image.fromarray(proof).convert("RGB")
+    d = ImageDraw.Draw(im)
+    f = ImageFont.load_default(size=max(12, im.width // 60))
+    for op in P["ops"]:
+        b = op_box(op, M) if op.get("kind") not in ("skip", "keep") else None
+        if not b:
             continue
-        x0, y0 = min(b[0] for _, b in boxes), min(b[1] for _, b in boxes)
-        x1, y1 = max(b[2] for _, b in boxes), max(b[3] for _, b in boxes)
-        pad = 0.5 * max(y1 - y0, 0.05 * min(W, H))
-        cb = (int(max(0, x0 - pad)), int(max(0, y0 - pad)), int(min(W, x1 + pad)), int(min(H, y1 + pad)))
-        pr = Image.fromarray(proof).convert("RGB")
-        d = ImageDraw.Draw(pr)
-        for j, (i, b) in enumerate(boxes):
-            d.rectangle(b, outline=cols[j % len(cols)], width=3)
-            d.text((b[0] + 3, b[1] + 2), i, fill=cols[j % len(cols)])
-        z = 1024 / max(cb[2] - cb[0], cb[3] - cb[1])
-        sz = (max(1, int((cb[2] - cb[0]) * z)), max(1, int((cb[3] - cb[1]) * z)))
-        parts += ["PROOF crop:", _png(pr.crop(cb).resize(sz, Image.LANCZOS)), "MARKED draft crop:", _png(mk.crop(cb).resize(sz, Image.LANCZOS))]
-        n_img += 1
-    ops = [by_id[i] for i in dict.fromkeys(ids)]
+        col = KIND_COL.get(op.get("kind"), (230, 30, 30))
+        d.rectangle(b, outline=col, width=2)
+        tw, th = d.textbbox((0, 0), op["id"], font=f)[2:]
+        d.rectangle([b[0], max(0, b[1] - th - 2), b[0] + tw + 2, max(0, b[1] - th - 2) + th + 2], fill=col)
+        d.text((b[0] + 1, max(0, b[1] - th - 2)), op["id"], fill=(255, 255, 255), font=f)
+    return im
+
+
+def _compare(draft: np.ndarray, proof: np.ndarray, M: dict, n_max: int = 3, side: int = 1280) -> list[bytes]:
+    """Ảnh SO SÁNH vùng đông ô: nháp (trái) | bản dựng (phải), cùng vùng cắt, phóng -- toàn cảnh 1024px quá nhỏ để thấy chữ
+    trong huy hiệu / chân trang (08/10)."""
+    from PIL import Image
+    H, W = draft.shape[:2]
+    out = []
+    for b in _cluster_boxes(M, W, H, n_max=n_max):
+        a, c = Image.fromarray(draft).crop(b), Image.fromarray(proof).crop(b)
+        im = Image.new("RGB", (a.width * 2 + 12, a.height), "white")
+        im.paste(a, (0, 0))
+        im.paste(c, (a.width + 12, 0))
+        z = min(side / im.width, side / im.height, 3.0)
+        out.append(_png(im.resize((max(1, int(im.width * z)), max(1, int(im.height * z))), Image.LANCZOS)))
+    return out
+
+
+def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], res: list[dict], prompt: str,
+           texts: list[dict], call, product: bool = False, meta: dict | None = None, changes: list[str] | None = None) -> dict:
+    """VÒNG DUYỆT (luôn chạy, 08/10 thay vòng sửa chỉ-khi-có-lỗi): VLM xem bản dựng cả tấm như giám đốc nghệ thuật -- sửa lỗi
+    khách quan (render.check) VÀ lỗi thẩm mỹ tự thấy (mồ côi, chữ nhỏ / mảnh trong huy hiệu, lệch tâm vỏ, cùng vai khác cỡ /
+    độ đậm, icon không đều...). Gửi: nháp, bản dựng, bản dựng có id lệnh, danh sách lệnh kèm cỡ / độ đậm / font DỰNG THẬT (không
+    cần OCR bản dựng: code biết chính xác đã viết gì ở đâu), lỗi. -> P mới (vá / xoá / thêm lệnh); rào chắn ở slots.accept."""
+    by_res = {r["id"]: r for r in res or []}
+    rows = []
+    for op in P["ops"]:
+        r = by_res.get(op["id"]) or {}
+        row = {k: op.get(k) for k in ("id", "marks", "kind", "client", "html", "box_style") if op.get(k) not in (None, "")}
+        Ls = [M["by"][m] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
+        if r.get("fs"):
+            row["rendered"] = {"drafted_px": round(float(np.median([m["size"] for m in Ls]))) if Ls else None,
+                               "font_px": round(r["fs"]), "weight": r.get("fw"), "font": (r.get("ff") or "").split(",")[0].strip("'\" ")}
+        rows.append(row)
+    ch = [c for c in changes or [] if not c.startswith("--")]
     user = (f"PROMPT given to the image model:\n{prompt}\n\nClient texts (exact words):\n{_texts(texts)}\n\n"
-            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nInvolved ops:\n{json.dumps(ops, ensure_ascii=False)}")
-    out = call(*((_system(SYSTEM) + "\n\n" + REPAIR, [user, *parts]) + ((meta,) if meta is not None else ())))
-    out = _obj(out)
+            + (PRODUCT_NOTE + "\n\n" if product else "") + f"{describe(M)}\n\nStyle: {json.dumps(P.get('style'), ensure_ascii=False)}"
+            f"\n\nRendered ops:\n{json.dumps(rows, ensure_ascii=False)}\n\nCODE CHANGES (engine log, op ids):\n"
+            + ("\n".join(ch) or "(none)") + "\n\nERRORS:\n" + ("\n".join(json.dumps(e, ensure_ascii=False) for e in errs) or "(none)"))
+    imgs = ["DRAFT:", _png(draft), "PROOF:", _png(proof), "PROOF-IDS:", _png(_ids_image(proof, M, P)),
+            "COMPARE (draft | proof):", *_compare(draft, proof, M)]
+    out = _obj(call(*((_system(SYSTEM) + "\n\n" + REVIEW, [user, *imgs]) + ((meta,) if meta is not None else ()))))
     new, patches = [], {p.get("id"): p for p in out.get("patches") or [] if isinstance(p, dict) and p.get("id")}
     for op in P["ops"]:
         p = patches.pop(op["id"], None)
@@ -815,7 +863,20 @@ def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     for pid, p in patches.items():   # lệnh MỚI (ô chưa quyết)
         if p.get("slots") and not p.get("delete"):
             new.append({**{k: v for k, v in p.items() if k != "delete"}, "marks": list(p["slots"])})
-    return _to_marks({**P, "ops": new, "repair_why": out.get("why")})
+    return _to_marks({**P, "ops": new, "review_why": out.get("why"), "review_findings": out.get("findings"),
+                      "review_patches": len(out.get("patches") or [])})
+
+
+REVIEW_ROUNDS = 2   # dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
+SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
+
+
+def accept(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> bool:
+    """Giữ bản sau vòng duyệt? Sửa thẩm mỹ không đo được, nên tin VLM -- trừ khi nó làm hỏng điều đo được: viết ít câu khách hơn,
+    hoặc thêm lỗi NẶNG (ô bỏ sót, chồng nhau, tràn, chìm nền). too_small / uneven_size được phép tăng (chữ to lên trong huy hiệu
+    có thể chạm sàn co)."""
+    sev = lambda E: sum(1 for e in E if e["type"] in SEVERE)   # noqa: E731
+    return score(P2, [])[0] <= score(P, [])[0] and sev(errs2) <= sev(errs)
 
 
 # ---------------------------------------------------------------------------------------------------- nền

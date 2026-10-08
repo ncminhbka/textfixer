@@ -112,7 +112,15 @@ Chọn bản sau vòng sửa (`slots.score`): nhiều câu khách được viế
 Kiểm (khách quan, không cần mắt): ô chưa thuộc lệnh nào, ô dùng hai lần, khung / nội dung hai lệnh chồng nhau, tràn khung, phải co
 dưới 70% (nhồi quá nhiều chữ), **tương phản** (dựng lại lần hai với chữ trong suốt = nền thật sau chữ; > 25% nền có tỉ lệ WCAG < 2
 với màu chữ, khối không có bóng / viền -> low_contrast), **cỡ không đều** (dòng cùng vai: model vẽ cùng cỡ, cùng font, thẳng cột /
-cùng hàng, gần nhau; cỡ dựng lệch > 25% -> uneven_size). Có lỗi: **một** vòng VLM chỉ vá các lệnh / ô lỗi (kèm ảnh phóng vùng lỗi), giữ bản ít lỗi hơn.
+cùng hàng, gần nhau; cỡ dựng lệch > 25% -> uneven_size). Renderer tự sửa trước khi duyệt: dòng cùng vai dựng cùng cỡ (cỡ nhỏ nhất nhóm), icon cùng hàng / cột cùng cỡ, chữ là toàn bộ
+nội dung một vỏ thì căn giữa dọc theo vỏ, font-size ở box_style là cỡ gốc của khung.
+
+**Vòng duyệt** (`slots.review`, 08/10, thay vòng sửa chỉ-khi-có-lỗi): luôn chạy, tối đa `REVIEW_ROUNDS` = 2 lượt (dừng khi VLM không
+sửa gì). VLM là giám đốc nghệ thuật xem bản dựng thật: nháp, bản dựng, bản dựng có id lệnh, ảnh so sánh nháp | bản dựng ở các cụm
+ô (phóng), danh sách lệnh kèm cỡ nháp -> cỡ / độ đậm / font dựng thật, **nhật ký thay đổi của code** (chặn chữ, căn cột, cân cỡ...:
+không được đảo ngược, chỉ sửa nguyên nhân) và lỗi đo được. Trả `findings` (thấy gì) rồi `patches` (sửa html / box_style, gộp ô,
+chuyển câu sang ô khác, đổi loại ô, xoá lệnh mồ côi không mang câu khách). Giữ bản duyệt khi không viết ít câu khách hơn và không
+thêm lỗi nặng (ô bỏ sót, chồng, tràn, chìm nền) -- `slots.accept`; thẩm mỹ không đo được nên tin VLM.
 
 ## Giới hạn đã biết
 
