@@ -142,8 +142,11 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
             if P2 is not P3:
                 log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
                 break
-        better, why = slots.judge(draft, poster, poster2, vlm) if slots.REVIEW_MODE == "full" else (True, "")
-        log.append(f"giám khảo: {'bản duyệt' if better else 'bản trước'} đẹp hơn ({why})")
+        if slots.REVIEW_MODE == "full":
+            better, why = slots.judge(draft, poster, poster2, vlm)
+            log.append(f"giám khảo: {'bản duyệt' if better else 'bản trước'} đẹp hơn ({why})")
+        else:   # chế độ errors: không gọi giám khảo, rào đo lường (accept) đã qua là giữ
+            better = True
         if not better:
             break
         poster, P, errs, res, changes = poster2, P2, errs2, res2, vlog2 + rlog2
