@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""MÁY CHỦ: tóm tắt các lượt chạy gần đây của máy chủ TextFix (output/runs) -- lỗi lượt đầu theo loại, vòng sửa có chạy / được giữ
-không, thời gian từng bước -- rồi gói plan.json + ảnh (poster, lượt đầu, nháp) thành zip < 24 MB, tự tải về.
+"""MÁY CHỦ: tóm tắt các lượt chạy gần đây của máy chủ TextFix (output/runs) -- lỗi lượt đầu theo loại, sửa bằng code / vòng duyệt
+VLM có chạy / được giữ không, thời gian từng bước -- rồi gói plan.json + ảnh (poster, lượt đầu, nháp) thành zip < 24 MB, tự tải về.
 
   %run scripts/runs_report.py              # 10 lượt chạy gần nhất (+ server.log)
   %run scripts/runs_report.py --last 3
@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         print("không có lượt mới")
     done = [rd.name for rd in runs if _done(rd)]
     first, final, trig, kept, n = collections.Counter(), collections.Counter(), 0, 0, 0
+    cfix, ckept = 0, 0
     T = collections.defaultdict(list)
     files = []
     for rd in runs:
@@ -94,15 +95,19 @@ def main(argv: list[str] | None = None) -> int:
             ran = any(l.startswith("-- vòng duyệt") for l in log)
             trig += ran
             kept += any("giữ bản đã duyệt" in l for l in log)
+            cf = any(l.startswith("-- sửa bằng code") for l in log)
+            cfix += cf
+            ckept += any(l == "-> giữ bản sửa" for l in log)
             for k, v in (P.get("timing") or {}).items():
                 T[k].append(v)
             print(f"{rd.name}/{vd.name}: lỗi nặng lượt đầu {[(e['type'], e.get('ops'), e.get('frac')) for e in sev]}"
-                  f" -> vòng sửa {'CÓ' if ran else 'không'}; lỗi cuối {len(P.get('errors') or [])}")
+                  f" -> sửa code {'CÓ' if cf else 'không'}, vòng duyệt VLM {'CÓ' if ran else 'không'};"
+                  f" lỗi nặng cuối {[(e['type'], e.get('ops')) for e in P.get('errors') or [] if e['type'] in SEVERE]}")
             for f in (["plan.json", "poster.png"] if a.light else
                       ["plan.json", "poster.png", "poster_first.png", "draft.png", "plate_raw.png", "plate.png"]):
                 if (vd / f).exists():
                     files.append((vd / f, f"{rd.name}/{vd.name}/{f}"))
-    print(f"\n{n} ảnh, vòng sửa chạy {trig}, được giữ {kept}")
+    print(f"\n{n} ảnh, sửa bằng code {cfix} (giữ {ckept}), vòng duyệt VLM {trig} (giữ {kept})")
     print("lỗi lượt đầu:", dict(first))
     print("lỗi cuối:", dict(final))
     print("thời gian trung vị:", {k: round(st.median(v), 1) for k, v in T.items()})

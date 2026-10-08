@@ -114,6 +114,20 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     errs = render.check(P, M, res)
     log += rlog + [f"LỖI: {e}" for e in errs]
     poster_first, errs_first = poster, errs   # bản lượt đầu (debug: so trước / sau vòng duyệt)
+    sev = lambda E: sum(e["type"] in slots.SEVERE for e in E)   # noqa: E731
+    for k in range(render.FIX_ROUNDS if sev(errs) else 0):   # SỬA BẰNG CODE: lỗi nặng đo được -> sửa, dựng lại, giữ khi bớt lỗi
+        P2, flog = render.autofix(P, M, errs, res)
+        if not flog:
+            break
+        poster2, res2, rlog2 = render.render(page, slots.base_image(draft, plate, M, P2), P2, M)
+        errs2 = render.check(P2, M, res2)
+        ok = (sev(errs2), len(errs2)) < (sev(errs), len(errs))
+        log += [f"-- sửa bằng code {k + 1} --"] + flog + [f"LỖI CÒN: {e}" for e in errs2] +             ["-> giữ bản sửa" if ok else "-> bản sửa không bớt lỗi, giữ bản trước"]
+        if not ok:
+            break
+        poster, P, errs, res = poster2, P2, errs2, res2
+        if not sev(errs):
+            break
     T["dung"] = time.time() - t0
     t0 = time.time()   # VÒNG DUYỆT (slots.REVIEW_MODE): "errors" -- 1 lượt, chỉ khi có lỗi nặng; "full" -- thẩm mỹ cả tấm
     changes = log[:]   # code đã đổi gì trong quyết định của VLM (chặn chữ, căn cột, cân cỡ...) -- vòng duyệt phải biết

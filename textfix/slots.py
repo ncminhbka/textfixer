@@ -948,7 +948,9 @@ REVIEW_ROUNDS = 2   # chế độ "full": dựng -> duyệt -> dựng -> duyệt
 #   "errors" (mặc định) -- MỘT lượt, CHỈ khi lượt đầu có lỗi nặng (SEVERE), chỉ sửa đúng các lỗi đó (~1 / 3 poster)
 #   "full"   -- duyệt thẩm mỹ cả tấm, REVIEW_ROUNDS lượt, có giám khảo (slots.judge)
 #   "off"    -- không bao giờ gọi VLM lần hai (độ trễ cố định; lỗi nặng còn nguyên trên poster)
-REVIEW_MODE = os.environ.get("TEXTFIX_REVIEW", "errors")
+# 08/10 (sau đợt server 1): mặc định "off" -- lỗi nặng sửa bằng code (render.autofix); bật lại bằng TEXTFIX_REVIEW=errors
+# nếu quan sát thấy code không cứu được
+REVIEW_MODE = os.environ.get("TEXTFIX_REVIEW", "off")
 ONLY_ERRORS = """MODE: FIX ONLY THE ERRORS. Fix exactly the ERRORS listed and nothing else -- every op not involved in an error \
 stays untouched; no aesthetic changes. Output "findings" for the errors only."""
 

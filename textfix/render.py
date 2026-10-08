@@ -17,6 +17,7 @@ import numpy as np
 
 DRAW = ("text", "icon", "stars", "shape", "group")
 OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi báo cho vòng sửa
+CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
 STAR_PATH = "M50 3 L61.8 37.6 L98.1 38.2 L69.1 60.1 L79.4 95 L50 74.2 L20.6 95 L30.9 60.1 L1.9 38.2 L38.2 37.6 Z"
 
@@ -44,7 +45,23 @@ def _ids(op: dict) -> list[str]:
 
 def op_geom(op: dict, M: dict) -> dict | None:
     """Khung DỰNG của lệnh = hợp khung các ô. Dòng NGHIÊNG (trung vị góc OCR các dòng L >= ROT_MIN): khung trong hệ trục xoay
-    theo góc đó (ôm sát dòng nghiêng), div dựng thẳng rồi xoay. -> {rect (chưa xoay), angle, poly (4 góc thật), aabb}."""
+    theo góc đó (ôm sát dòng nghiêng), div dựng thẳng rồi xoay. -> {rect (chưa xoay), angle, poly (4 góc thật), aabb}.
+    Lệnh có fix.box (autofix cắt / thu khung): rect = fix.box (hệ trục của dòng), góc giữ như đo."""
+    g = _geom(op, M)
+    fb = (op.get("fix") or {}).get("box")
+    if g is None or not fb:
+        return g
+    t = np.radians(g["angle"])
+    c, sn = np.cos(t), np.sin(t)
+    cx, cy, w, h = (fb[0] + fb[2]) / 2, (fb[1] + fb[3]) / 2, fb[2] - fb[0], fb[3] - fb[1]
+    corners = [[cx + u * c - v * sn, cy + u * sn + v * c] for u, v in ((-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2))]
+    xs, ys = [p[0] for p in corners], [p[1] for p in corners]
+    W, H = M["size"]
+    return {"rect": list(fb), "angle": g["angle"], "poly": corners,
+            "aabb": [max(0.0, min(xs)), max(0.0, min(ys)), min(float(W), max(xs)), min(float(H), max(ys))]}
+
+
+def _geom(op: dict, M: dict) -> dict | None:
     by, (W, H) = M["by"], M["size"]
     ids = [m for m in _ids(op) if m in by]
     if not ids:
@@ -208,6 +225,10 @@ async (o) => {
       (e.fit === 'grow' ? `min-width:${e.box[2] - e.box[0]}px;min-height:${e.box[3] - e.box[1]}px;width:max-content;` :
                           `width:${e.box[2] - e.box[0]}px;height:${e.box[3] - e.box[1]}px;`) + (e.style || '');
     d.innerHTML = e.html;
+    if (e.cls) d.className = e.cls;
+    // dòng nghiêng: renderer tự xoay đúng góc đo (bên dưới) -- transform VLM ghi ở khung (rotate(-14deg)) bỏ trước khi đo,
+    // không thì "đo trước khi xoay" là đo khối đã xoay (tràn / nét sai)
+    if (e.angle) d.style.transform = 'none';
     c.appendChild(d);
     const R0 = c.getBoundingClientRect();
     // TRÀN = nội dung thật (mọi con, kể cả SVG) vượt khung ở BẤT KỲ phía nào (nội dung căn giữa tràn cả trái -- scrollWidth chỉ
@@ -233,8 +254,9 @@ async (o) => {
       return {top: r * Math.max(0, mt.fontBoundingBoxAscent - mt.actualBoundingBoxAscent) / 100,
               bot: r * Math.max(0, mt.fontBoundingBoxDescent - mt.actualBoundingBoxDescent) / 100};
     })();
+    let inner = d;   // phần đo nội dung (sau khi nén ngang: bên trong span nén -- hộp span cao theo line-height, đo nó là tràn dọc oan)
     const over = () => {
-      const rr = document.createRange(); rr.selectNodeContents(d);
+      const rr = document.createRange(); rr.selectNodeContents(inner);
       const q = rr.getBoundingClientRect(), b = d.getBoundingClientRect();
       const fs = parseFloat(d.style.fontSize) || 0;
       return {q, v: Math.max(0, b.left - q.left, q.right - b.right, b.top - q.top - pad.top * fs, q.bottom - b.bottom - pad.bot * fs)};
@@ -247,14 +269,33 @@ async (o) => {
                 box: [b0.left - R0.left, b0.top - R0.top, b0.right - R0.left, b0.bottom - R0.top]});
       continue;
     }
-    let s = e.size, k = 0, m = over();
+    let s = e.size, k = 0, m = over(), sx = 1;
     const m0q = m.q, m0b = d.getBoundingClientRect(), fs0 = parseFloat(d.style.fontSize) || 0;   // tràn lúc CHƯA co: ngang / dọc
     const o0 = [Math.max(0, m0b.left - m0q.left, m0q.right - m0b.right),
                 Math.max(0, m0b.top - m0q.top - pad.top * fs0, m0q.bottom - m0b.bottom - pad.bot * fs0)];
+    // NÉN NGANG trước khi co: chữ dài hơn ô (tràn ngang) -> scaleX tới o.condense, giữ cỡ chữ (chiều cao) như nháp -- co cỡ
+    // làm chữ bé hẳn so với nháp (08/10 server: too_small 33 / 27 ảnh). Chỉ khối chữ dòng (không div / p / li bên trong: bọc
+    // lại sẽ đổi bố cục flex của VLM); tâm nén theo căn lề của khung.
+    if (((e.fit !== 'grow' && e.fit !== 'none') || e.even) && o0[0] > 1 && !d.querySelector('div,p,ul,ol,li,table,section')) {
+      sx = Math.max(e.condense || o.condense, Math.min(1, m0b.width / Math.max(1, m0q.width)));
+      const j = getComputedStyle(d).justifyContent;
+      const org = /start|left/.test(j) ? 'left' : /end|right/.test(j) ? 'right' : 'center';
+      d.innerHTML = `<span style="display:inline-block;flex:none;white-space:inherit;transform:scaleX(${sx});` +
+                    `transform-origin:${org} center">${d.innerHTML}</span>`;
+      inner = d.firstElementChild;
+      m = over();
+    }
     if (e.fit !== 'grow' && e.fit !== 'none') {   // co nội dung cho vừa khung (em theo font-size của khung)
       while (m.v > 1 && s > o.floor && k < 80) { s *= 0.95; d.style.fontSize = s + 'px'; k++; m = over(); }
     }
     const m0 = m.v;   // tràn đo khi CHƯA xoay (sau khi xoay, khung thẳng ôm ngoài lệch so với nội dung)
+    let ink0 = null;   // chữ xoay: nét mực CHƯA xoay + tâm xoay -> đa giác nét thật (hộp thẳng ôm chữ xoay chồng oan dòng kề)
+    if (e.angle) {
+      const q0 = m.q, b0 = d.getBoundingClientRect(), f0 = parseFloat(d.style.fontSize) || 0;
+      ink0 = {r: [q0.left - R0.left, q0.top - R0.top + Math.min(pad.top * f0, q0.height / 3),
+                  q0.right - R0.left, q0.bottom - R0.top - Math.min(pad.bot * f0, q0.height / 3)],
+              c: [(b0.left + b0.right) / 2 - R0.left, (b0.top + b0.bottom) / 2 - R0.top]};
+    }
     if (e.angle) { d.style.transformOrigin = '50% 50%'; d.style.transform = `rotate(${e.angle}deg)`; m = over(); m.v = m0; }
     const q = m.q, b = d.getBoundingClientRect();
     // NÉT MỰC = hộp chữ trừ phần đệm trên / dưới của font (dòng chồng sát nhau như FLASH / SALE thì hộp font chồng 0.2-0.3 dù
@@ -270,7 +311,7 @@ async (o) => {
           cs.webkitBackgroundClip === 'text') fx = true;
       if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
     }
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw,
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw, sx: +sx.toFixed(2), ink0, angle: e.angle,
               ink: [q.left - R0.left, q.top - R0.top + it, q.right - R0.left, q.bottom - R0.top - ib],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -293,7 +334,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     dfont = font_key(st.get("display_font")) or tfont
     used = {tfont, dfont}
     med = float(np.median([m["size"] for m in M["L"]])) if M.get("L") else 0.0
-    els, log = [], []
+    els, log, force = [], [], []
     # LỚP: vỏ (shape / group) vẽ trước, chi tiết / chữ vẽ sau -- vỏ không bao giờ đè lên nội dung đặt trong nó
     for op in sorted(P["ops"], key=lambda o: o.get("kind") not in ("shape", "group")):
         if op.get("kind") not in DRAW or not (op.get("html") or op.get("box_style")):
@@ -301,6 +342,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         g = op_geom(op, M)
         if g is None:
             continue
+        fix = op.get("fix") or {}
         b = g["rect"]
         # 1em = cỡ chữ model vẽ ở các dòng của lệnh, hoặc các dòng NẰM TRONG khung lệnh (vỏ: cỡ chữ model vẽ trong vỏ);
         # không có dòng nào: nửa cao khung; ô chỉ gồm chi tiết I#: cao ô (icon / hàng sao không ghi cỡ lấp đúng ô)
@@ -343,16 +385,23 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         # tới khi 2 dòng li ti lọt ô (08/10: 59 / 78 lệnh bị co là "tràn dọc" kiểu này); một dòng co theo chiều ngang to hơn
         if op.get("kind") == "text" and len(lm) == 1 and not re.search(r"<br", op.get("html") or "", flags=re.I):
             bs = "white-space:nowrap;" + bs
+        cls = None
+        if fix.get("color"):   # SỬA BẰNG CODE (fix): chữ chìm nền -> màu tương phản (+ quầng) cưỡng cho mọi phần tử trong khối
+            cls = f"fx{len(els)}"
+            force.append(f"#c>.{cls},#c>.{cls} *{{color:{fix['color']}!important;-webkit-text-fill-color:{fix['color']}!important;"
+                         + (f"text-shadow:0 0 .08em {fix['halo']},0 0 .16em {fix['halo']},0 0 .3em {fix['halo']}!important;"
+                            if fix.get("halo") else "") + "}")
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
-                    "fit": op.get("fit") or "shrink", "angle": g["angle"], "icon": op.get("kind") == "icon" and bool(mk)
+                    "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
+                    "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
                     and all(m.startswith("I") for m in mk)})
     log += _align_left(els) + _even_icons(els)
     page.set_viewport_size({"width": W, "height": H})
     html = (f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
             f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
-            f"</style></head><body><div id=c></div></body></html>")
+            f"{''.join(force)}</style></head><body><div id=c></div></body></html>")
     page.set_content(html)
-    res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H)})
+    res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H), "condense": CONDENSE})
     # CÙNG VAI CÙNG CỠ: mỗi dòng tự co cho vừa ô của nó -> các mục một danh sách lệch cỡ (08/10 r01: 20 / 24 / 24 / 19px). Dựng
     # lại cả nhóm ở cỡ nhỏ nhất của nhóm (nhỏ hơn thì chắc chắn vừa ô, không co thêm)
     size0, fs = {e["id"]: e["size"] for e in els}, {r["id"]: r.get("fs") for r in res}
@@ -367,12 +416,13 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         lo = min(fs[i] for i in g)
         for i in g:
             if fs[i] > lo * 1.03:
-                by_el[i]["size"], by_el[i]["fit"] = by_res[i]["size"] * lo / fs[i], "none"
+                # cỡ chung, không co thêm; vẫn được nén ngang (dòng nhỏ nhất nhóm có thể đã nén mới giữ được cỡ đó)
+                by_el[i]["size"], by_el[i]["fit"], by_el[i]["even"] = by_res[i]["size"] * lo / fs[i], "none", True
                 changed.append(i)
     if changed:
         log.append(f"cùng vai cùng cỡ: dựng lại {changed}")
         page.set_content(html)
-        res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H)})
+        res = page.evaluate(RENDER_JS, {"els": els, "floor": floor or 0.012 * min(W, H), "condense": CONDENSE})
         for r in res:
             r["shrink"] = r["size"] / size0[r["id"]] if size0.get(r["id"]) else 1
             r["evened"] = r["id"] in changed   # nhỏ đi vì theo dòng nhỏ nhất nhóm: lỗi too_small chỉ tính ở dòng đó
@@ -385,8 +435,14 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         s.setProperty('color', 'transparent', 'important'); s.setProperty('-webkit-text-fill-color', 'transparent', 'important');
         s.setProperty('text-shadow', 'none', 'important'); s.setProperty('-webkit-text-stroke-width', '0', 'important'); } }""")
     bg = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
+    color0 = {e["id"]: e["color"] for e in els}
     for r in res:
         r["low"] = _low_contrast(r, bg, img)
+    bad = lambda r: (r["low"] or 0) > (0.6 if r.get("px_based") else CONTRAST_FRAC)   # noqa: E731
+    pal = list(dict.fromkeys(r["fg"] for r in res if r.get("fg") and not bad(r)))   # màu chữ đọc tốt trên poster
+    for r in res:
+        if bad(r):
+            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal)
     return img, res, log
 
 
@@ -427,6 +483,50 @@ def _low_contrast(r: dict, bg: np.ndarray, img: np.ndarray | None = None) -> flo
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
     ratio = (np.maximum(lf, lb) + 0.05) / (np.minimum(lf, lb) + 0.05)
     return round(float((ratio < CONTRAST_PX).mean()), 2)
+
+
+def _rgb(c: str | None) -> tuple | None:
+    if not c:
+        return None
+    m = re.match(r"#([0-9a-f]{6})$", c.strip(), flags=re.I)
+    if m:
+        return tuple(int(m.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+    m = re.match(r"rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)", c)
+    return tuple(float(m.group(i)) for i in (1, 2, 3)) if m else None
+
+
+def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None) -> dict | None:
+    """Chữ chìm nền: màu chữ thay thế, ưu tiên HỢP BẢNG MÀU (08/10 replay: tiêu đề vàng nhạt -> gần đen, đọc được nhưng thô) --
+    màu các chữ đọc tốt khác trên poster, rồi màu nháp tối / sáng dần, cuối cùng trắng / gần đen: màu ĐẦU TIÊN có <= 10% nền
+    chìm (tương phản WCAG < CONTRAST_PX). Không màu nào đạt: màu ít chìm nhất + quầng màu ngược độ sáng."""
+    H, W = bg.shape[:2]
+    x0, y0, x1, y1 = r["ink"]
+    x0, y0, x1, y1 = int(max(0, x0)), int(max(0, y0)), int(min(W, x1)), int(min(H, y1))
+    if x1 - x0 < 2 or y1 - y0 < 2:
+        return None
+    lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
+    cands = list(pal or [])   # màu chữ khác của chính poster trước: hợp bảng màu (màu nháp pha đen ra xám đục -- 08/10 h08_s1)
+    d = _rgb(draft_color) or _rgb(r.get("fg"))
+    if d:
+        for t in (0.35, 0.6, 0.8):
+            for to in (0, 255):
+                cands.append("#%02x%02x%02x" % tuple(int(round(v + (to - v) * t)) for v in d))
+    cands += ["#ffffff", "#161616"]
+    best = None
+    for c in dict.fromkeys(cands):
+        rgb = _rgb(c)
+        if rgb is None:
+            continue
+        lf = float(_lum(np.array([rgb], np.float32))[0])
+        f = float(((np.maximum(lf, lb) + 0.05) / (np.minimum(lf, lb) + 0.05) < CONTRAST_PX).mean())
+        if f <= 0.1:
+            best = (c, f, lf)
+            break
+        if best is None or f < best[1] - 0.02:
+            best = (c, f, lf)
+    c, f, lf = best
+    return {"color": c, "frac": round(f, 2), "halo": ("rgba(0,0,0,.55)" if lf > 0.4 else "rgba(255,255,255,.6)")
+            if f > CONTRAST_FRAC else None}
 
 
 def _even_icons(els: list[dict]) -> list[str]:
@@ -504,6 +604,18 @@ def _ov(a, b) -> float:
     return w * h / s if w > 0 and h > 0 and s > 0 else 0.0
 
 
+def _ink_poly(r: dict) -> list:
+    """Đa giác nét mực của kết quả dựng: chữ xoay = nét chưa xoay xoay quanh tâm khung; chữ thẳng = khung nét."""
+    i0 = r.get("ink0")
+    if not i0 or not r.get("angle"):
+        x0, y0, x1, y1 = r["ink"]
+        return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+    t = np.radians(r["angle"])
+    c, sn = np.cos(t), np.sin(t)
+    (x0, y0, x1, y1), (cx, cy) = i0["r"], i0["c"]
+    return [[cx + (x - cx) * c - (y - cy) * sn, cy + (x - cx) * sn + (y - cy) * c] for x, y in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))]
+
+
 def _poly_ov(a, b) -> float:
     """Phần giao hai đa giác lồi (khung có thể nghiêng) / diện tích đa giác nhỏ hơn."""
     import cv2
@@ -551,8 +663,9 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
         for b in (res or [])[i + 1:]:
             if a.get("empty") or b.get("empty"):
                 continue
-            if (a["id"], b["id"]) not in pairs and _ov(a["ink"], b["ink"]) > OVERLAP:
-                errs.append({"type": "content_overlap", "ops": [a["id"], b["id"]], "frac": round(_ov(a["ink"], b["ink"]), 2)})
+            o = _poly_ov(_ink_poly(a), _ink_poly(b)) if a.get("angle") or b.get("angle") else _ov(a["ink"], b["ink"])
+            if (a["id"], b["id"]) not in pairs and o > OVERLAP:
+                errs.append({"type": "content_overlap", "ops": [a["id"], b["id"]], "frac": round(o, 2)})
         if a["over"] > 1 and boxes.get(a["id"]):
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
         elif shrink_min and a.get("shrink", 1) < shrink_min and not a.get("evened"):   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
@@ -561,6 +674,90 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
     errs += _uneven(P, M, res or [])
     return errs
+
+
+FIX_ROUNDS = 2   # sửa bằng code: sửa -> dựng -> kiểm, tối đa 2 lượt (lượt 2 sửa lỗi lượt 1 làm lộ ra)
+
+
+def _trim(A: list, B: list) -> list | None:
+    """Khung A cắt bớt MỘT phía để không còn giao B -- phía giữ được nhiều diện tích A nhất; None khi cắt mất quá nửa."""
+    w, h = A[2] - A[0], A[3] - A[1]
+    c = [[A[0], A[1], min(A[2], B[0]), A[3]], [max(A[0], B[2]), A[1], A[2], A[3]],
+         [A[0], A[1], A[2], min(A[3], B[1])], [A[0], max(A[1], B[3]), A[2], A[3]]]
+    c = [x for x in c if x[2] - x[0] > 2 and x[3] - x[1] > 2]
+    if not c or w <= 0 or h <= 0:
+        return None
+    best = max(c, key=lambda x: (x[2] - x[0]) * (x[3] - x[1]))
+    return best if (best[2] - best[0]) * (best[3] - best[1]) >= 0.5 * w * h else None
+
+
+def autofix(P: dict, M: dict, errs: list[dict], res: list[dict]) -> tuple[dict, list[str]]:
+    """SỬA LỖI NẶNG BẰNG CODE (thay vòng duyệt VLM, 08/10): quyết định thiết kế của VLM giữ nguyên, chỉ sửa phần đo được.
+      mark_twice      -- ô giữ ở lệnh đầu, bỏ khỏi lệnh sau
+      unassigned      -- ô bỏ sót = skip (bản xoá đã sạch; không tự viết chữ không ai quyết)
+      low_contrast    -- màu chữ tương phản nhất với nền thật ({màu nháp, trắng, gần đen}), nền loang thêm quầng
+      overflow        -- nén ngang sâu hơn (0.75)
+      boxes_overlap / content_overlap -- lệnh lấn (nét thò khỏi khung nhiều hơn, hoặc khung to hơn) cắt khung một phía cho
+                         hết giao, co nội dung trong khung mới. Lệnh xoay / vỏ (shape, group) không cắt.
+    -> (P mới, log). Không lỗi nào sửa được: P y nguyên."""
+    import copy
+    P2 = copy.deepcopy(P)
+    ops = {o["id"]: o for o in P2["ops"]}
+    R = {r["id"]: r for r in res}
+    log = []
+    fx = lambda i: ops[i].setdefault("fix", {})   # noqa: E731
+    for e in errs:
+        t, ids = e["type"], [i for i in e.get("ops") or [] if i in ops]
+        if t == "mark_twice" and len(ids) == 2:
+            o = ops[ids[1]]
+            o["marks"] = [m for m in o.get("marks") or [] if m != e["mark"]]
+            log.append(f"{ids[1]}: bỏ ô {e['mark']} (đã thuộc {ids[0]})")
+        elif t == "unassigned" and e.get("slots"):
+            P2["ops"].append({"id": f"fix_skip{len(P2['ops'])}", "kind": "skip", "marks": list(e["slots"]), "html": "",
+                              "why": "autofix: ô bỏ sót"})
+            log.append(f"ô bỏ sót {e['slots']} -> skip")
+        elif t == "low_contrast" and ids and (R.get(ids[0]) or {}).get("recolor"):
+            rc = R[ids[0]]["recolor"]
+            fx(ids[0]).update(color=rc["color"], halo=rc["halo"])
+            log.append(f"{ids[0]}: chìm nền {e['frac']} -> màu {rc['color']}" + (" + quầng" if rc["halo"] else ""))
+        elif t == "overflow" and ids:
+            fx(ids[0])["condense"] = 0.75
+            log.append(f"{ids[0]}: tràn {e['px']}px -> nén ngang tới 0.75")
+        elif t in ("boxes_overlap", "content_overlap") and len(ids) == 2:
+            G = {i: op_geom(ops[i], M) for i in ids}
+            if any(G[i] is None for i in ids):
+                continue
+            box = {i: G[i]["aabb"] for i in ids}
+
+            def spill(i):   # phần nét chữ thò ra ngoài khung của chính lệnh
+                r = R.get(i)
+                if not r:
+                    return 0.0
+                a, b = r["ink"], box[i]
+                area = max(1.0, (a[2] - a[0]) * (a[3] - a[1]))
+                return 1 - _ov(a, b) * min(area, (b[2] - b[0]) * (b[3] - b[1])) / area
+            cand = [i for i in ids if ops[i].get("kind") not in ("shape", "group")]
+            if not cand:
+                continue
+            area = lambda i: (box[i][2] - box[i][0]) * (box[i][3] - box[i][1])   # noqa: E731
+            # lệnh thẳng cắt được một phía; lệnh xoay chỉ thu đều quanh tâm (khung thật nghiêng) -> ưu tiên lệnh thẳng
+            i = max(cand, key=lambda i: (not G[i]["angle"], round(spill(i), 2), area(i)))
+            j = ids[1] if i == ids[0] else ids[0]
+            if G[i]["angle"]:
+                r0 = G[i]["rect"]
+                cx, cy, w, h = (r0[0] + r0[2]) / 2, (r0[1] + r0[3]) / 2, 0.85 * (r0[2] - r0[0]), 0.85 * (r0[3] - r0[1])
+                fx(i).update(box=[round(v, 1) for v in (cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)], fit="shrink")
+                log.append(f"{i}: chồng {j} ({t} {e.get('frac')}), chữ xoay -> thu khung 0.85 quanh tâm")
+                continue
+            other = R[j]["ink"] if t == "content_overlap" and R.get(j) else box[j]
+            nb = _trim(box[i], other)
+            if nb is None:
+                log.append(f"{i}: chồng {j} nhưng cắt khung mất quá nửa -> để nguyên")
+                continue
+            fx(i).update(box=[round(v, 1) for v in nb], fit="shrink")
+            log.append(f"{i}: chồng {j} ({t} {e.get('frac')}) -> cắt khung còn {[round(v) for v in nb]}")
+    P2["ops"] = [o for o in P2["ops"] if o.get("kind") == "skip" or o.get("marks")]
+    return P2, log
 
 
 UNEVEN = 1.25   # cùng cụm (model vẽ cùng cỡ, thẳng cột / cùng hàng, gần nhau) mà cỡ dựng lệch > 25% = lỗi uneven_size

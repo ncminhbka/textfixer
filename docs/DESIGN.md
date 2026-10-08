@@ -115,7 +115,18 @@ với màu chữ, khối không có bóng / viền -> low_contrast), **cỡ khô
 cùng hàng, gần nhau; cỡ dựng lệch > 25% -> uneven_size). Renderer tự sửa trước khi duyệt: dòng cùng vai dựng cùng cỡ (cỡ nhỏ nhất nhóm), icon cùng hàng / cột cùng cỡ, chữ là toàn bộ
 nội dung một vỏ thì căn giữa dọc theo vỏ, font-size ở box_style là cỡ gốc của khung.
 
-**Vòng duyệt** (`slots.review`). Mặc định `REVIEW_MODE = "errors"`: MỘT lượt, chỉ khi lượt đầu có lỗi nặng (ô bỏ sót, chồng,
+**Nén ngang** (`render.CONDENSE` = 0.85): chữ dài hơn ô theo chiều ngang được scaleX tới 0.85 trước khi co cỡ (giữ chiều cao
+chữ như nháp; replay probe4: cỡ dựng / cỡ nháp trung vị 0.79 -> 0.84, too_small 31 -> 24).
+
+**Sửa bằng code** (`render.autofix`, 08/10 -- thay vòng duyệt VLM): lượt đầu có lỗi nặng -> sửa phần đo được, dựng lại, giữ khi
+bớt lỗi (tối đa `FIX_ROUNDS` = 2). mark_twice: ô giữ ở lệnh đầu; unassigned: ô bỏ sót = skip; low_contrast: màu chữ thay thế
+(màu chữ khác của poster, rồi màu nháp tối / sáng dần, rồi trắng / gần đen; nền loang thêm quầng); overflow: nén ngang tới 0.75;
+boxes_overlap / content_overlap: lệnh lấn cắt khung một phía (chữ xoay: thu khung 0.85 quanh tâm). Chồng nội dung của chữ xoay đo
+bằng đa giác nét thật (hộp thẳng ôm chữ xoay chồng oan dòng kề). Replay probe4: lỗi nặng 5 -> 1 (còn lại: VLM gộp dòng xen kẽ vào
+hai lệnh, code không gỡ được).
+
+**Vòng duyệt** (`slots.review`). Từ 08/10 mặc định `REVIEW_MODE = "off"` (lỗi nặng do code sửa; bật lại `TEXTFIX_REVIEW=errors`
+nếu quan sát thấy code không cứu được). Chế độ `"errors"`: MỘT lượt, chỉ khi lượt đầu có lỗi nặng (ô bỏ sót, chồng,
 tràn, chìm nền), chỉ sửa đúng các lỗi đó -- lượt 3-4 (08/10) cho thấy duyệt thẩm mỹ tốn ~20 s / poster mà ~2 / 15 poster đẹp hơn,
 ~5 xấu đi. Chế độ `"full"` (`TEXTFIX_REVIEW=full`, `vlm_probe.py --review full`) giữ lại để thử: luôn chạy, tối đa `REVIEW_ROUNDS` = 2 lượt (dừng khi VLM không
 sửa gì). VLM là giám đốc nghệ thuật xem bản dựng thật: nháp, bản dựng, bản dựng có id lệnh, ảnh so sánh nháp | bản dựng ở các cụm
