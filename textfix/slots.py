@@ -380,7 +380,8 @@ TEXT
 between the lines of a multi-line op). Write about as many characters per line as the model wrote there -- never much more: \
 crammed text gets shrunk and looks bad.
 - A client text longer than the lines the model gave it: shorten or rephrase it so it fits naturally; facts (names, prices, \
-numbers, dates, phones, addresses, emails, links) are never changed or invented -- keep them exact or leave them out. Set \
+numbers, dates, phones, addresses, emails, links) are never changed or invented -- keep them exact or leave them out; the \
+unit belongs to the number (15-25 triệu, 35.000đ, 30 phút, 50%): never drop it. Set \
 "client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
 "missing".
 - SPELLING: copy client words character for character, with every Vietnamese diacritic. The draft's letters are often \
@@ -423,6 +424,9 @@ never merge list rows into one block and never leave a bullet or icon without it
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
 - Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
 script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
+- Letter width: each line lists how wide the drawn letters are (em per character) and the catalog lists each font's width \
+(mixed case / caps). Pick a font within about 0.05em of the line (caps width for all-caps lines): a wider font does not fit \
+the slot and gets shrunk, a narrower one looks lost in it.
 - Same role, same look: rows of one list / menu / table, the items of one card set, the labels of one badge set share ONE \
 font, size, weight and color -- write the same font-size on all of them (the smallest that fits), never one row big and the \
 next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up.
@@ -451,7 +455,9 @@ crops: the PROOF (rendered; each involved op outlined with its id) and the MARKE
 nearly matches what is really behind it -- pick a palette color with strong contrast, or add a text-shadow / outline, or \
 recreate the shell the draft had), uneven_size (lines of one role rendered at different sizes, "sizes" in px -- give them \
 all the same font-size, the smallest that fits, and the same font / weight). Never fix too_small by only lowering the \
-font-size: shorten the text or merge lines. Fix ONLY these errors. Slots never move: you change text, merging of \
+font-size: shorten the text or merge lines (a narrower font of the same style also helps). Never skip or delete a client \
+text (headline, price, phone...) to make an error go away -- a poster missing its words is worse than any error. Fix ONLY \
+these errors. Slots never move: you change text, merging of \
 consecutive lines, html, box_style.
 
 OUTPUT one JSON object: {"patches": [{"id": "o6", "slots": [...], "kind": "...", "html": "...", "box_style": "...", "client": ...,
@@ -474,6 +480,12 @@ def _look(m: dict) -> str:
         out.append("thick-thin strokes (serif / script)")
     if m.get("caps"):
         out.append("all caps")
+    n = len(m.get("ocr") or "")
+    if n >= 4 and m.get("size") and abs(m.get("angle") or 0) < 2:
+        # ĐỘ RỘNG CHỮ: rộng khung / (số ký tự x cỡ) -- so với độ rộng font ở danh mục (08/10: designer chọn font rộng hơn chữ nháp
+        # -> phải co ~0.66, phần lớn lỗi too_small); OCR sai chữ nhưng số ký tự gần đúng
+        w = (m["box"][2] - m["box"][0]) / (n * m["size"])
+        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else ""))
     e = m.get("effect")
     if e:
         if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:
@@ -495,9 +507,10 @@ def describe(M: dict) -> str:
 
 
 def _system(base: str) -> str:
-    from .fonts import CATALOG
+    from .fonts import CATALOG, WIDTH
     from .icons import available
-    fonts = "; ".join(f"{k}: {v[0]} ({v[1]})" for k, v in CATALOG.items())
+    fonts = "; ".join(f"{k}: {v[0]} ({v[1]}" + (f", {WIDTH[k][0]:.2f} / caps {WIDTH[k][1]:.2f}em" if k in WIDTH else "") + ")"
+                      for k, v in CATALOG.items())
     return base.replace("{fonts}", fonts).replace("{icons}", ", ".join(sorted(available())))
 
 
@@ -635,6 +648,13 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, l
     return {**P, "ops": ops}, log
 
 
+def score(P: dict, errs: list[dict]) -> tuple:
+    """So bản lượt đầu / sau vòng sửa (nhỏ hơn = tốt hơn): trước hết số câu khách được viết (08/10 m03: vòng sửa bỏ tiêu đề
+    "KHAI TRƯƠNG" để hết lỗi too_small và được giữ vì ít lỗi hơn), rồi số lỗi, rồi mức chồng / tràn."""
+    told = {_tid(op.get("client")) for op in P.get("ops", []) if op.get("kind") == "text" and op.get("html")} - {None}
+    return -len(told), len(errs), sum(e.get("frac", 0) + e.get("px", 0) / 100 for e in errs)
+
+
 def _fold(s: str) -> str:
     """Bỏ dấu tiếng Việt, chữ thường: "TRƯỞNG" == "trương" == "TRUONG"."""
     import unicodedata
@@ -644,7 +664,13 @@ def _fold(s: str) -> str:
 
 def _plain(h: str) -> str:
     import html as H
-    return " ".join(H.unescape(re.sub(r"<br\s*/?>", " ", re.sub(r"<(?!br)[^>]+>", "", h or ""))).split())
+    # <br> / <BR> / thẻ khối = dấu cách; thẻ inline (span, i-font) không tách chữ (08/10 m01: "FLASH<BR>SALE" thành "FLASHSALE")
+    h = re.sub(r"<\s*(br|/?div|/?p)\b[^>]*>", " ", h or "", flags=re.I)
+    return " ".join(H.unescape(re.sub(r"<[^>]+>", "", h)).split())
+
+
+def _flat(s: str) -> str:
+    return re.sub(r"\W", "", _fold(s))
 
 
 def _tid(c) -> int | None:
@@ -677,7 +703,8 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
         own = txt[k] if k is not None and 0 <= k < len(txt) else None
         words = WORD.findall(plain)
         if own is not None and words and not any(c.isdigit() for c in plain) and \
-                not {_fold(w) for w in words} & {_fold(w) for w in vocab_all}:
+                not {_fold(w) for w in words} & {_fold(w) for w in vocab_all} and \
+                not any(_flat(plain) in _flat(t) for t in txt):   # chữ dính / tách khác câu khách vẫn là chữ khách
             log.append(f"{op.get('id')}: chữ không có trong câu khách ({plain!r} khai {op.get('client')}) -> skip")
             out.append({**op, "kind": "skip", "html": "", "why": "guard: invented text"})
             continue
@@ -717,6 +744,23 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
         for i in idx[allowed:]:
             log.append(f"{out[i].get('id')}: lặp chữ {_plain(out[i]['html'])!r} (giữ {out[idx[0]].get('id')}) -> skip")
             out[i] = {**out[i], "kind": "skip", "html": "", "why": "guard: duplicate"}
+    # 4. CÂU NGẮN (<= 3 chữ: lương "15-25 triệu", giá, nhãn) không được cắt bớt -- câu dài mới được rút gọn (08/10 h06: vòng sửa
+    #    bỏ "triệu" cho vừa ô). Một lệnh viết câu đó mà thiếu chữ -> trả nguyên câu khách vào đúng chỗ chữ trong html.
+    for k, t in enumerate(txt):
+        tw = WORD.findall(t)
+        mine = [i for i, op in enumerate(out) if op.get("kind") == "text" and op.get("html") and _tid(op.get("client")) == k]
+        if not tw or len(tw) > 3 or len(mine) != 1:
+            continue
+        op = out[mine[0]]
+        plain = _plain(op["html"])
+        lost = {_fold(w) for w in tw} - {_fold(w) for w in WORD.findall(plain)}
+        if not lost or not plain or plain not in op["html"]:
+            continue
+        near = {_fold(w) for o in out if o is not op and o.get("kind") == "text" for w in WORD.findall(_plain(o.get("html") or ""))}
+        if lost & near:   # chữ thiếu đã nằm ở lệnh khác (huy hiệu tách "Giảm" / "50%" thành hai ô)
+            continue
+        log.append(f"{op.get('id')}: câu ngắn bị cắt {plain!r} -> {t!r}")
+        out[mine[0]] = {**op, "html": op["html"].replace(plain, t, 1)}
     return out, log
 
 

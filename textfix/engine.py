@@ -94,8 +94,7 @@ class Engine:
                 poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
                 errs2 = render.check(P2, M, res2)
                 log += ["-- vòng sửa lỗi --", f"VLM: {P2.get('repair_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]
-                bad = lambda E: (len(E), sum(e.get("frac", 0) + e.get("px", 0) / 100 for e in E))   # noqa: E731  ít lỗi, rồi ít chồng
-                if bad(errs2) < bad(errs):
+                if slots.score(P2, errs2) < slots.score(P, errs):   # đủ câu khách, rồi ít lỗi, rồi ít chồng
                     poster, P, errs = poster2, P2, errs2
                     log.append("-> giữ bản đã sửa")
                 else:

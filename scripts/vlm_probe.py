@@ -101,7 +101,6 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as e:
                 return (v, k), None, mt, f"{type(e).__name__}: {str(e)[:300]}"
 
-        bad = lambda E: (len(E), sum(e.get("frac", 0) + e.get("px", 0) / 100 for e in E))   # noqa: E731  như engine
         with Browser() as B, ThreadPoolExecutor(a.workers) as ex:
             first, todo_fix = {}, []
             # 2. lập lệnh (song song) -> 3. dựng + kiểm (tuần tự)
@@ -138,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
                             errs2 = render.check(P2, x["M"], res2)
                             rec["errs_repair"] = errs2
                             rec["log"] += ["-- vòng sửa --"] + vlog2 + rlog2
-                            if bad(errs2) < bad(errs):
+                            if slots.score(P2, errs2) < slots.score(P, errs):   # như engine
                                 out_P, out_poster, out_errs = P2, poster2, errs2
                                 rec["kept"] = "repair"
                 (a.out / v).mkdir(exist_ok=True)

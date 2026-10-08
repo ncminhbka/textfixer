@@ -106,6 +106,24 @@ WEIGHT = lambda m: (300 if m < 0.07 else 400 if m < 0.11 else 700 if m < 0.16 el
 HEAD = 1.4   # dòng cao >= 1.4 cỡ chữ trung vị của poster = tiêu đề -> mặc định style.display_font
 
 
+def _clip_text_shadow(h: str) -> str:
+    """Chữ tô gradient (background-clip:text, màu chữ trong suốt): text-shadow vẽ DƯỚI lớp tô và lộ qua chữ trong suốt -> chữ
+    vàng thành nâu (08/10 h08_s1). Đổi bóng sang filter:drop-shadow (bóng của cả khối chữ đã tô), viền -webkit-text-stroke
+    vẽ sau phần tô (paint-order) để viền chỉ ở mép ngoài."""
+    def fix(m):
+        st = m.group(2)
+        if not re.search(r"background-clip\s*:\s*text", st, flags=re.I):
+            return m.group(0)
+        sh = re.search(r"(?<![-\w])text-shadow\s*:\s*([^;]+);?", st, flags=re.I)
+        if sh:
+            parts = [x.strip() for x in re.split(r",(?![^(]*\))", sh.group(1)) if x.strip() and x.strip() != "none"]
+            st = st.replace(sh.group(0), "") + (";filter:" + " ".join(f"drop-shadow({x})" for x in parts) if parts else "")
+        if "text-stroke" in st:
+            st += ";paint-order:stroke fill"
+        return f"style={m.group(1)}{st}{m.group(1)}"
+    return re.sub(r"""style=(["'])(.*?)\1""", fix, h, flags=re.S)
+
+
 def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
     """HTML của VLM -> HTML dựng được: an toàn (bỏ script / on* / URL / img) + thay thẻ tiện ích i-icon / i-stars / i-font."""
     from .fonts import family
@@ -166,6 +184,7 @@ def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
     h = re.sub(r"<i-stars\b[^>]*?(/>|>\s*</i-stars>|>)", stars, h, flags=re.I)
     h = re.sub(r"<i-font\b[^>]*>", font, h, flags=re.I)
     h = re.sub(r"</i-font>", "</span>", h, flags=re.I)
+    h = _clip_text_shadow(h)
     # font ghi thẳng bằng CSS (font-family:'Dancing Script') cũng phải được nạp (07/10 h08: rơi về font dự phòng)
     for fam in re.findall(r"font-family\s*:\s*([^;\"]+)", h, flags=re.I):
         k = font_key(fam.split(",")[0].strip(" '\""))
@@ -440,7 +459,7 @@ UNEVEN = 1.25   # cùng cụm (model vẽ cùng cỡ, thẳng cột / cùng hàn
 
 
 def _uneven(P: dict, M: dict, res: list) -> list[dict]:
-    """Các dòng cùng vai (model vẽ cùng cỡ +-20%, thẳng mép trái / tâm hoặc cùng hàng, cách nhau <= 4 cỡ) phải dựng cùng cỡ
+    """Các dòng cùng vai (model vẽ cùng cỡ +-15%, cùng font, thẳng MÉP TRÁI hoặc cùng hàng, cách nhau <= 3 cỡ) phải dựng cùng cỡ
     (08/10 r01: các mục của một danh sách cỡ lệch nhau ~2 lần vì mỗi lệnh tự co / tự ghi cỡ)."""
     fs = {r["id"]: r["fs"] for r in res if r.get("fs")}
     ff = {r["id"]: r.get("ff") for r in res}   # khác font thì cỡ px không so được (chữ viết tay cần cỡ khác chữ in)
@@ -460,12 +479,12 @@ def _uneven(P: dict, M: dict, res: list) -> list[dict]:
     for i, (ia, sa, ba) in enumerate(T):
         for ib, sb, bb in T[i + 1:]:
             s = max(sa, sb)
-            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.2 or ff[ia] != ff[ib]:
+            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.15 or ff[ia] != ff[ib]:
                 continue
-            col = abs(ba[0] - bb[0]) <= 0.6 * s or abs((ba[0] + ba[2]) - (bb[0] + bb[2])) / 2 <= 0.6 * s
+            col = abs(ba[0] - bb[0]) <= 0.6 * s   # thẳng tâm thì không: tiêu đề / nút / chân trang xếp giữa là các vai khác nhau
             row = abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * s
             gap = max(ba[1] - bb[3], bb[1] - ba[3], 0)
-            if (col or row) and gap <= 4 * s:
+            if (col or row) and gap <= 3 * s:
                 par[root(ia)] = root(ib)
     groups = {}
     for t in T:

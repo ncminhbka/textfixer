@@ -100,7 +100,14 @@ tiêu đề đậm thành mảnh); khoá font viết sai / tên họ font khớp
 
 Chặn chữ trước khi dựng (`slots.validate` + câu khách, 08/10): chữ khác câu khách chỉ ở dấu (TRƯỞNG / TRƯỜNG cho TRƯƠNG) -> thay đúng
 chữ khách; lệnh khai câu khách mà không chữ nào có trong câu khách (chép mẩu OCR vỡ) -> skip; hai lệnh cùng một chữ mà câu khách
-không lặp (nháp vẽ một dòng hai lần) -> giữ lệnh có OCR giống nhất.
+không lặp (nháp vẽ một dòng hai lần) -> giữ lệnh có OCR giống nhất. Câu khách ngắn (<= 3 chữ: lương, giá, nhãn) không được cắt
+bớt (vòng sửa từng bỏ "triệu" cho vừa ô) -> trả nguyên câu.
+
+Độ rộng chữ: mỗi dòng ghi độ rộng nét chữ đo trên nháp (em / ký tự), danh mục font ghi độ rộng từng font (`fonts.WIDTH`, đo bằng
+`scripts/font_widths.py`) -- chọn font rộng hơn chữ nháp là nguyên nhân chính của too_small (08/10). Chữ tô gradient: text-shadow đổi
+thành filter:drop-shadow (bóng lộ qua chữ trong suốt làm vàng thành nâu).
+
+Chọn bản sau vòng sửa (`slots.score`): nhiều câu khách được viết hơn trước, rồi ít lỗi hơn (vòng sửa từng bỏ tiêu đề để hết lỗi).
 
 Kiểm (khách quan, không cần mắt): ô chưa thuộc lệnh nào, ô dùng hai lần, khung / nội dung hai lệnh chồng nhau, tràn khung, phải co
 dưới 70% (nhồi quá nhiều chữ), **tương phản** (dựng lại lần hai với chữ trong suốt = nền thật sau chữ; > 25% nền có tỉ lệ WCAG < 2

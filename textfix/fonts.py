@@ -77,6 +77,56 @@ CATALOG = {
 }
 
 
+WIDTH = {   # em / ký tự (chữ thường lẫn hoa, IN HOA) ở độ đậm đậm nhất <= 800; scripts/font_widths.py
+    'bevietnam': (0.54, 0.61),
+    'montserrat': (0.55, 0.63),
+    'inter': (0.48, 0.57),
+    'jakarta': (0.5, 0.57),
+    'lexend': (0.56, 0.65),
+    'archivo': (0.51, 0.6),
+    'chakra': (0.5, 0.55),
+    'oswald': (0.43, 0.47),
+    'anton': (0.42, 0.41),
+    'barlowcond': (0.39, 0.41),
+    'sairaxc': (0.31, 0.34),
+    'bigshoulders': (0.38, 0.38),
+    'robotocond': (0.42, 0.48),
+    'bevietnami': (0.53, 0.61),
+    'montserrati': (0.56, 0.63),
+    'kaniti': (0.51, 0.56),
+    'barlowcondi': (0.38, 0.4),
+    'sairai': (0.49, 0.55),
+    'chakrai': (0.5, 0.55),
+    'baloo': (0.47, 0.52),
+    'grandstander': (0.51, 0.51),
+    'bungee': (0.6, 0.62),
+    'paytone': (0.53, 0.56),
+    'playfair': (0.48, 0.59),
+    'cormorant': (0.41, 0.57),
+    'lora': (0.5, 0.6),
+    'prata': (0.5, 0.63),
+    'yeseva': (0.52, 0.58),
+    'ebgaramond': (0.45, 0.6),
+    'fraunces': (0.44, 0.56),
+    'playfairi': (0.48, 0.6),
+    'cormoranti': (0.38, 0.51),
+    'lorai': (0.48, 0.59),
+    'dancing': (0.39, 0.55),
+    'greatvibes': (0.33, 0.78),
+    'alexbrush': (0.37, 0.7),
+    'pacifico': (0.43, 0.68),
+    'allura': (0.37, 0.57),
+    'imperial': (0.33, 0.66),
+    'playball': (0.41, 0.58),
+    'lobster': (0.4, 0.52),
+    'mali': (0.53, 0.63),
+    'patrickhand': (0.37, 0.42),
+    'sriracha': (0.46, 0.54),
+    'mansalva': (0.44, 0.65),
+    'sedgwick': (0.43, 0.48),
+}
+
+
 def family(key: str) -> str:
     fam, _, fb, _ = CATALOG[key]
     return f"'{fam}', {fb}"
