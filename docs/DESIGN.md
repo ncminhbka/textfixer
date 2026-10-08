@@ -94,13 +94,23 @@ nhúng sẵn. HTML được làm sạch (bỏ script, `on*`, URL, img).
 
 Đo tràn: khung ô ôm nét mực, hộp chữ trình duyệt = ascent + descent của font -> trừ phần đệm trên / dưới (measureText trên chính chữ của khối), không thì mọi dòng bị co ~0.6-0.8 (lỗi 07/10: 80% lỗi too_small, chữ nhỏ hơn nháp). Nạp hết font trước khi đo.
 
+Mặc định khi VLM không ghi: dòng cao >= 1.4 cỡ trung vị dùng `display_font`, độ đậm = độ đậm đo trên nháp (trước 08/10 dựng 400:
+tiêu đề đậm thành mảnh); khoá font viết sai / tên họ font khớp về khoá gần nhất, font ghi thẳng bằng CSS cũng được nạp; không giả
+đậm font thiếu độ đậm. Dòng căn trái cùng cỡ thẳng cột: mép trái cả cột = mép nhỏ nhất (khung OCR thò thụt).
+
+Chặn chữ trước khi dựng (`slots.validate` + câu khách, 08/10): chữ khác câu khách chỉ ở dấu (TRƯỞNG / TRƯỜNG cho TRƯƠNG) -> thay đúng
+chữ khách; lệnh khai câu khách mà không chữ nào có trong câu khách (chép mẩu OCR vỡ) -> skip; hai lệnh cùng một chữ mà câu khách
+không lặp (nháp vẽ một dòng hai lần) -> giữ lệnh có OCR giống nhất.
+
 Kiểm (khách quan, không cần mắt): ô chưa thuộc lệnh nào, ô dùng hai lần, khung / nội dung hai lệnh chồng nhau, tràn khung, phải co
-dưới 70% (nhồi quá nhiều chữ). Có lỗi: **một** vòng VLM chỉ vá các lệnh / ô lỗi (kèm ảnh phóng vùng lỗi), giữ bản ít lỗi hơn.
+dưới 70% (nhồi quá nhiều chữ), **tương phản** (dựng lại lần hai với chữ trong suốt = nền thật sau chữ; > 25% nền có tỉ lệ WCAG < 2
+với màu chữ, khối không có bóng / viền -> low_contrast), **cỡ không đều** (dòng cùng vai: model vẽ cùng cỡ, cùng font, thẳng cột /
+cùng hàng, gần nhau; cỡ dựng lệch > 25% -> uneven_size). Có lỗi: **một** vòng VLM chỉ vá các lệnh / ô lỗi (kèm ảnh phóng vùng lỗi), giữ bản ít lỗi hơn.
 
 ## Giới hạn đã biết
 
 - Vỏ **nửa trong suốt** trên nền gần cùng màu chênh quá ít, không thành S#: chữ trong đó vẫn được vẽ, nhưng thiếu vỏ; chữ sáng có
-  thể chìm trên nền sáng (chưa có bước kiểm tương phản).
+  thể chìm trên nền sáng (kiểm low_contrast báo cho vòng sửa).
 - Vỏ dính liền vỏ khác (thẻ + pill trong thẻ) thành một mảng không gọn có thể không được nhận.
 - Bản xoá xoá cả chữ / nhãn thuộc cảnh và trên sản phẩm: chỉ cứu được qua `keep` của designer (OCR phải bắt được dòng).
 - Dòng OCR không bắt được thì không thành ô (chưa tách dòng từ lớp phủ còn thừa).

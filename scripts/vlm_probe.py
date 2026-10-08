@@ -112,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
                     first[(v, k)] = (rec, None, None, None)
                     continue
                 x = D[k]
-                P, vlog = slots.validate(P, x["M"])
+                P, vlog = slots.validate(P, x["M"], x["texts"])
                 poster, res, rlog = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P), P, x["M"])
                 errs = render.check(P, x["M"], res)
                 rec.update(errs_first=errs, log=vlog + rlog)
@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
                         rec["repair_meta"], rec["repair_error"] = mt, err
                         if P2 is not None:
                             x = D[k]
-                            P2, vlog2 = slots.validate(P2, x["M"])
+                            P2, vlog2 = slots.validate(P2, x["M"], x["texts"])
                             poster2, res2, rlog2 = render.render(B.page, slots.base_image(x["draft"], x["plate"], x["M"], P2), P2, x["M"])
                             errs2 = render.check(P2, x["M"], res2)
                             rec["errs_repair"] = errs2

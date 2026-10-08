@@ -75,7 +75,7 @@ class Engine:
         T["o"] = time.time() - t0
         t0 = time.time()
         self.progress("VLM thiết kế")
-        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm, product=product, base=plate), M)
+        P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], self.vlm, product=product, base=plate), M, B["texts"])
         if cinfo["lines"]:
             log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
         T["vlm"] = time.time() - t0
@@ -90,7 +90,7 @@ class Engine:
             self.progress("VLM sửa lỗi")
             try:
                 P2, vlog2 = slots.validate(slots.repair(draft, poster, M, P, errs, B["prompt_en"], B["texts"], self.vlm,
-                                                        product=product), M)
+                                                        product=product), M, B["texts"])
                 poster2, res2, rlog2 = render.render(self.browser.page, slots.base_image(draft, plate, M, P2), P2, M)
                 errs2 = render.check(P2, M, res2)
                 log += ["-- vòng sửa lỗi --", f"VLM: {P2.get('repair_why')}"] + vlog2 + rlog2 + [f"LỖI CÒN: {e}" for e in errs2]

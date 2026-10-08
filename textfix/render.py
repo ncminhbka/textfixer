@@ -88,9 +88,27 @@ def _attr(tag: str, name: str, default=None):
     return m.group(2) if m else default
 
 
+def font_key(k) -> str | None:
+    """Khoá font VLM ghi -> khoá CATALOG: đúng khoá, tên họ font ("Dancing Script"), hoặc gần nhất ("bevietsans" -> bevietnam)."""
+    from difflib import get_close_matches
+    from .fonts import CATALOG
+    if not isinstance(k, str) or not k.strip():
+        return None
+    if k in CATALOG:
+        return k
+    norm = lambda x: re.sub(r"[^a-z]", "", x.lower())   # noqa: E731
+    names = {norm(v[0]): key for key, v in CATALOG.items()} | {norm(key): key for key in CATALOG}
+    m = get_close_matches(norm(k), list(names), n=1, cutoff=0.6)
+    return names[m[0]] if m else None
+
+
+WEIGHT = lambda m: (300 if m < 0.07 else 400 if m < 0.11 else 700 if m < 0.16 else 900)   # noqa: E731  nét / cỡ chữ -> độ đậm (như slots._look)
+HEAD = 1.4   # dòng cao >= 1.4 cỡ chữ trung vị của poster = tiêu đề -> mặc định style.display_font
+
+
 def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
     """HTML của VLM -> HTML dựng được: an toàn (bỏ script / on* / URL / img) + thay thẻ tiện ích i-icon / i-stars / i-font."""
-    from .fonts import CATALOG, family
+    from .fonts import family
     from .icons import nearest
     log = []
     h = re.sub(r"<script.*?</script>", "", h or "", flags=re.S | re.I)
@@ -134,10 +152,13 @@ def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
 
     def font(m):
         t = m.group(0)
-        key, wt = _attr(t, "key", ""), _attr(t, "weight", "")
-        if key not in CATALOG:
-            log.append(f"font '{key}' không có -> font mặc định")
-            return "<span>"
+        raw, wt = _attr(t, "key", ""), _attr(t, "weight", "")
+        key = font_key(raw)
+        if key is None:
+            log.append(f"font '{raw}' không có -> font mặc định")
+            return f"<span style=\"{'font-weight:' + wt + ';' if wt else ''}\">"
+        if key != raw:
+            log.append(f"font '{raw}' -> '{key}'")
         fonts_used.add(key)
         return f"<span style=\"font-family:{family(key)};{'font-weight:' + wt + ';' if wt else ''}\">"
 
@@ -145,6 +166,11 @@ def expand(h: str, icons: dict, fonts_used: set) -> tuple[str, list[str]]:
     h = re.sub(r"<i-stars\b[^>]*?(/>|>\s*</i-stars>|>)", stars, h, flags=re.I)
     h = re.sub(r"<i-font\b[^>]*>", font, h, flags=re.I)
     h = re.sub(r"</i-font>", "</span>", h, flags=re.I)
+    # font ghi thẳng bằng CSS (font-family:'Dancing Script') cũng phải được nạp (07/10 h08: rơi về font dự phòng)
+    for fam in re.findall(r"font-family\s*:\s*([^;\"]+)", h, flags=re.I):
+        k = font_key(fam.split(",")[0].strip(" '\""))
+        if k:
+            fonts_used.add(k)
     return h, log
 
 
@@ -159,7 +185,7 @@ async (o) => {
   for (const e of o.els) {
     const d = document.createElement('div');
     d.style.cssText = `position:absolute;left:${e.box[0]}px;top:${e.box[1]}px;box-sizing:border-box;display:flex;align-items:center;` +
-      `justify-content:center;text-align:center;line-height:1.15;font-family:${e.font};color:${e.color};font-size:${e.size}px;` +
+      `justify-content:center;text-align:center;line-height:1.15;font-synthesis:style;font-family:${e.font};color:${e.color};font-size:${e.size}px;` +
       (e.fit === 'grow' ? `min-width:${e.box[2] - e.box[0]}px;min-height:${e.box[3] - e.box[1]}px;width:max-content;` :
                           `width:${e.box[2] - e.box[0]}px;height:${e.box[3] - e.box[1]}px;`) + (e.style || '');
     d.innerHTML = e.html;
@@ -200,7 +226,16 @@ async (o) => {
     const m0 = m.v;   // tràn đo khi CHƯA xoay (sau khi xoay, khung thẳng ôm ngoài lệch so với nội dung)
     if (e.angle) { d.style.transformOrigin = '50% 50%'; d.style.transform = `rotate(${e.angle}deg)`; m = over(); m.v = m0; }
     const q = m.q, b = d.getBoundingClientRect();
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v,
+    // MÀU CHỮ thật (màu tính được của phần tử chứa nhiều chữ nhất) + có hiệu ứng tách nền không (bóng / viền / chữ tô gradient)
+    let fg = null, fx = false, best = 0, fs = null, ff = null;
+    const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
+    for (let t = tw.nextNode(); t; t = tw.nextNode()) {
+      const n = t.textContent.trim().length, cs = getComputedStyle(t.parentElement);
+      if (cs.textShadow !== 'none' || parseFloat(cs.webkitTextStrokeWidth) > 0 || cs.backgroundClip === 'text' ||
+          cs.webkitBackgroundClip === 'text') fx = true;
+      if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; }
+    }
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, fg, fx, fs, ff,
               ink: [q.left - R0.left, q.top - R0.top, q.right - R0.left, q.bottom - R0.top],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -214,13 +249,15 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
     Mặc định khi VLM không nói: font = style.text_font, cỡ (1em) = cỡ chữ đo được của các dòng L trong lệnh (không có dòng: nửa cao
     khung), màu = màu đo của dòng."""
     from PIL import Image
-    from .fonts import CATALOG, faces_for, family
+    from .fonts import faces_for, family
     from .icons import available
     H, W = plate.shape[:2]
     icons = available()
     st = P.get("style") or {}
-    tfont = st.get("text_font") if st.get("text_font") in CATALOG else "bevietnam"
-    used = {tfont} | ({st["display_font"]} if st.get("display_font") in CATALOG else set())
+    tfont = font_key(st.get("text_font")) or "bevietnam"
+    dfont = font_key(st.get("display_font")) or tfont
+    used = {tfont, dfont}
+    med = float(np.median([m["size"] for m in M["L"]])) if M.get("L") else 0.0
     els, log = [], []
     # LỚP: vỏ (shape / group) vẽ trước, chi tiết / chữ vẽ sau -- vỏ không bao giờ đè lên nội dung đặt trong nó
     for op in sorted(P["ops"], key=lambda o: o.get("kind") not in ("shape", "group")):
@@ -239,13 +276,25 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         if mk and all(m.startswith("I") for m in mk):
             size = b[3] - b[1]
         color = next((m["color"] for m in Ls if m.get("color")), "#161616")
+        # MẶC ĐỊNH khi VLM không ghi (i-font / CSS trong lệnh thắng): tiêu đề dùng display_font, độ đậm = độ đậm đo trên nháp
+        # (07/10: lệnh không ghi weight dựng ở 400 -> tiêu đề / tên đậm trong nháp thành chữ mảnh)
+        fam = dfont if med and Ls and size >= HEAD * med else tfont
+        st_w = [m["stroke"] / m["size"] for m in Ls if m.get("stroke") and m.get("size")]
+        wt = WEIGHT(float(np.median(st_w))) if st_w else None
         # VLM ghi cỡ bằng px poster (đọc thẳng từ số đo dòng / khung); đổi sang em theo cỡ khung để vòng co vẫn co đều mọi thứ
         html = re.sub(r"(\d+(?:\.\d+)?)px\b", lambda m: f"{float(m.group(1)) / max(size, 1.0):.4f}em", op.get("html") or "")
         h, lg = expand(html, icons, used)
         log += [f"{op['id']}: {x}" for x in lg]
         bs, lg = expand(op.get("box_style") or "", icons, used)
-        els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(tfont),
+        log += [f"{op['id']}: {x}" for x in lg]
+        if re.search(r"text-align\s*:\s*(left|start)", bs) and "justify-content" not in bs:   # căn trái mà khối vẫn ở giữa ô
+            bs += ";justify-content:flex-start"
+        elif re.search(r"text-align\s*:\s*(right|end)", bs) and "justify-content" not in bs:
+            bs += ";justify-content:flex-end"
+        bs = (f"font-weight:{wt};" if wt else "") + bs
+        els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": op.get("fit") or "shrink", "angle": g["angle"]})
+    log += _align_left(els)
     page.set_viewport_size({"width": W, "height": H})
     page.set_content(f"<html><head><style>{faces_for(tuple(sorted(used)))} *{{margin:0;padding:0;box-sizing:border-box}} #c{{position:relative;"
                      f"width:{W}px;height:{H}px;overflow:hidden;background:url('{to_data_uri(plate)}') 0 0/{W}px {H}px no-repeat}}"
@@ -255,7 +304,71 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         if r["shrink"] < 0.7:
             log.append(f"{r['id']}: co còn {r['shrink']:.2f} để vừa khung")
     img = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
+    # NỀN THẬT sau chữ (bản xoá + vỏ + nền khung lệnh, chữ trong suốt) -> tỉ lệ tương phản chữ / nền (check: low_contrast)
+    page.evaluate("""() => { for (const x of document.querySelectorAll('#c *')) { const s = x.style;
+        s.setProperty('color', 'transparent', 'important'); s.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+        s.setProperty('text-shadow', 'none', 'important'); s.setProperty('-webkit-text-stroke-width', '0', 'important'); } }""")
+    bg = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
+    for r in res:
+        r["low"] = _low_contrast(r, bg)
     return img, res, log
+
+
+CONTRAST_PX = 2.0   # điểm nền mà màu chữ trên đó có tỉ lệ tương phản WCAG < 2 = chữ chìm (chữ thân cần >= 4.5, chữ lớn >= 3)
+CONTRAST_FRAC = 0.25   # > 25% nền sau khối chữ là điểm chìm = lỗi low_contrast (khối chữ không có bóng / viền)
+
+
+def _lum(rgb: np.ndarray) -> np.ndarray:
+    c = rgb.astype(np.float32) / 255.0
+    c = np.where(c <= 0.03928, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    return c @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+
+
+def _low_contrast(r: dict, bg: np.ndarray) -> float | None:
+    """Phần nền (trong khung nét chữ của lệnh) mà màu chữ của lệnh chìm trên đó."""
+    m = re.match(r"rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?", r.get("fg") or "")
+    if not m or (m.group(4) is not None and float(m.group(4)) < 0.5) or r.get("empty"):
+        return None
+    H, W = bg.shape[:2]
+    x0, y0, x1, y1 = r["ink"]
+    x0, y0, x1, y1 = int(max(0, x0)), int(max(0, y0)), int(min(W, x1)), int(min(H, y1))
+    if x1 - x0 < 2 or y1 - y0 < 2:
+        return None
+    lf = float(_lum(np.array([[float(m.group(i)) for i in (1, 2, 3)]])[0]))
+    lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
+    ratio = (np.maximum(lf, lb) + 0.05) / (np.minimum(lf, lb) + 0.05)
+    return round(float((ratio < CONTRAST_PX).mean()), 2)
+
+
+def _align_left(els: list[dict]) -> list[str]:
+    """Cột căn trái (các mục của một danh sách / thực đơn): khung OCR mỗi dòng thò thụt vài px -> dựng ra mép trái lởm chởm
+    (08/10 r01, h02). Dòng căn trái, cùng cỡ (+-25%), mép trái lệch <= 0.6 cỡ, cách nhau <= 3 cỡ theo chiều dọc = một cột:
+    mép trái cả cột = mép trái nhỏ nhất (khung chỉ nới sang trái, không đổi ô đo)."""
+    L = [e for e in els if not e["angle"] and re.search(r"justify-content\s*:\s*(flex-)?start", e["style"] or "")]
+    par = list(range(len(L)))
+
+    def root(i):
+        while par[i] != i:
+            i = par[i]
+        return i
+    for i, a in enumerate(L):
+        for j in range(i + 1, len(L)):
+            b, s = L[j], max(a["size"], L[j]["size"])
+            gap = max(a["box"][1] - b["box"][3], b["box"][1] - a["box"][3], 0)
+            if max(a["size"], b["size"]) / max(1.0, min(a["size"], b["size"])) <= 1.25 and \
+                    abs(a["box"][0] - b["box"][0]) <= 0.6 * s and gap <= 3 * s:
+                par[root(i)] = root(j)
+    groups, log = {}, []
+    for i, e in enumerate(L):
+        groups.setdefault(root(i), []).append(e)
+    for g in groups.values():
+        x = min(e["box"][0] for e in g)
+        moved = [e["id"] for e in g if e["box"][0] - x >= 1]
+        for e in g:
+            e["box"] = [x] + list(e["box"][1:])
+        if len(g) >= 2 and moved:
+            log.append(f"căn thẳng mép trái {[e['id'] for e in g]} ở x={x:.0f}")
+    return log
 
 
 def _ov(a, b) -> float:
@@ -317,7 +430,52 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
         elif shrink_min and a.get("shrink", 1) < shrink_min:   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
             errs.append({"type": "too_small", "ops": [a["id"]], "shrink": round(a["shrink"], 2)})
+        if (a.get("low") or 0) > CONTRAST_FRAC and not a.get("fx"):   # chữ chìm vào nền thật sau nó
+            errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
+    errs += _uneven(P, M, res or [])
     return errs
+
+
+UNEVEN = 1.25   # cùng cụm (model vẽ cùng cỡ, thẳng cột / cùng hàng, gần nhau) mà cỡ dựng lệch > 25% = lỗi uneven_size
+
+
+def _uneven(P: dict, M: dict, res: list) -> list[dict]:
+    """Các dòng cùng vai (model vẽ cùng cỡ +-20%, thẳng mép trái / tâm hoặc cùng hàng, cách nhau <= 4 cỡ) phải dựng cùng cỡ
+    (08/10 r01: các mục của một danh sách cỡ lệch nhau ~2 lần vì mỗi lệnh tự co / tự ghi cỡ)."""
+    fs = {r["id"]: r["fs"] for r in res if r.get("fs")}
+    ff = {r["id"]: r.get("ff") for r in res}   # khác font thì cỡ px không so được (chữ viết tay cần cỡ khác chữ in)
+    T = []
+    for op in P["ops"]:
+        Ls = [M["by"][m] for m in op.get("marks") or [] if m.startswith("L") and m in M["by"]]
+        if op.get("kind") != "text" or not Ls or op["id"] not in fs:
+            continue
+        b = [min(m["box"][0] for m in Ls), min(m["box"][1] for m in Ls), max(m["box"][2] for m in Ls), max(m["box"][3] for m in Ls)]
+        T.append((op["id"], float(np.median([m["size"] for m in Ls])), b))
+    par = {t[0]: t[0] for t in T}
+
+    def root(x):
+        while par[x] != x:
+            x = par[x]
+        return x
+    for i, (ia, sa, ba) in enumerate(T):
+        for ib, sb, bb in T[i + 1:]:
+            s = max(sa, sb)
+            if max(sa, sb) / max(1.0, min(sa, sb)) > 1.2 or ff[ia] != ff[ib]:
+                continue
+            col = abs(ba[0] - bb[0]) <= 0.6 * s or abs((ba[0] + ba[2]) - (bb[0] + bb[2])) / 2 <= 0.6 * s
+            row = abs((ba[1] + ba[3]) - (bb[1] + bb[3])) / 2 <= 0.3 * s
+            gap = max(ba[1] - bb[3], bb[1] - ba[3], 0)
+            if (col or row) and gap <= 4 * s:
+                par[root(ia)] = root(ib)
+    groups = {}
+    for t in T:
+        groups.setdefault(root(t[0]), []).append(t[0])
+    out = []
+    for g in groups.values():
+        sz = [fs[i] for i in g]
+        if len(g) >= 2 and max(sz) / max(1.0, min(sz)) > UNEVEN:
+            out.append({"type": "uneven_size", "ops": g, "sizes": {i: round(fs[i]) for i in g}})
+    return out
 
 
 KIND_COL = {"text": (230, 30, 30), "icon": (30, 120, 230), "stars": (240, 170, 0), "shape": (160, 40, 200), "group": (160, 40, 200),

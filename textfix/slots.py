@@ -3,7 +3,7 @@ dựng đúng khung từng ô (render.py), theo lớp vỏ -> chi tiết -> ch�
 
   M = build(draft, plate)                         # S# vỏ, I# chi tiết nhỏ, L# dòng chữ (OCR, khung nắn theo lớp phủ, số đo nét)
   P = plan(draft, M, prompt, texts, call)         # VLM: {style, ops: [{slots, kind, html, box_style, client}], missing}
-  P, log = validate(P, M)
+  P, log = validate(P, M, texts)                 # + chặn chữ: dấu theo câu khách, chữ bịa, dòng lặp
   base = base_image(draft, plate, M, P)           # bản xoá + dán lại pixel nháp ở dòng "keep" (chữ in trên sản phẩm / màn hình)
   P2 = repair(draft, poster, M, P, errs, prompt, texts, call)   # có lỗi (render.check): một vòng, chỉ các lệnh / ô lỗi
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 
 import numpy as np
 
@@ -221,6 +222,38 @@ def _snap(L: dict, ink: np.ndarray, others: np.ndarray) -> list[float]:
     return [float(max(bx[0], x0 - h)), float(max(bx[1], y0 - h)), float(min(bx[2], x1 + h)), float(min(bx[3], y1 + h))]
 
 
+def _unstack(L: list[dict]) -> None:
+    """Hai dòng xếp chồng có nét dính nhau (dấu "Ữ" chạm chân "MENU"): mảng dính chạm cả hai đa giác OCR nên khung nắn của dòng
+    này nuốt cả dòng kia -> hai ô chồng nhau, designer viết hai dòng đè lên nhau (08/10 h02). Khung nắn không được vượt sang
+    ranh giới với dòng bên cạnh (trên / dưới, trái / phải) = giữa khe (hoặc giữa phần giao) hai khung OCR. Khung OCR giao nhau
+    >= nửa cao (rộng) theo cả hai chiều: không phân xử được, giữ nguyên."""
+    new = []
+    for a in L:
+        x0, y0, x1, y1 = a["box"]
+        ox0, oy0, ox1, oy1 = a["ocr_box"]
+        for b in L if abs(a.get("angle") or 0) < 2 else []:
+            if b is a:
+                continue
+            bx0, by0, bx1, by1 = b["ocr_box"]
+            if min(x1, bx1) - max(x0, bx0) <= 0 or min(y1, by1) - max(y0, by0) <= 0:
+                continue   # khung nắn của a không chạm khung OCR của b
+            vy = (min(oy1, by1) - max(oy0, by0)) / max(1.0, min(oy1 - oy0, by1 - by0))
+            vx = (min(ox1, bx1) - max(ox0, bx0)) / max(1.0, min(ox1 - ox0, bx1 - bx0))
+            if vy < 0.5 and vy <= vx:   # trên / dưới
+                if by0 + by1 < oy0 + oy1:
+                    y0 = max(y0, (by1 + oy0) / 2)
+                else:
+                    y1 = min(y1, (by0 + oy1) / 2)
+            elif vx < 0.5:              # trái / phải
+                if bx0 + bx1 < ox0 + ox1:
+                    x0 = max(x0, (bx1 + ox0) / 2)
+                else:
+                    x1 = min(x1, (bx0 + ox1) / 2)
+        new.append([float(x0), float(y0), float(x1), float(y1)])
+    for a, b in zip(L, new):
+        a["box"] = b
+
+
 def build(draft: np.ndarray, plate: np.ndarray) -> dict:
     """Ô của nháp: L# (dòng OCR + số đo nét, khung nắn theo lớp phủ, vỏ chứa nó), S# vỏ, I# chi tiết nhỏ (overlay.overlay)."""
     import cv2
@@ -244,7 +277,8 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
                 others |= pm
         l["ocr_box"] = list(l["box"])
         l["box"] = _snap(l, ink, others)
-    S = [{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
+    _unstack(L)
+    S =[{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
     for s in S:
         s["lines"] = [L[j]["id"] for j in s["lines"]]
     # chi tiết không bao giờ ĐÈ lên chữ; bỏ chi tiết nằm trong khung dòng đã nắn (gạch đầu dòng thuộc dòng) và lồng trong chi tiết khác
@@ -313,8 +347,8 @@ icon, avatar and star -- only the picture remains (the BASE). Code measured exac
 You decide what each slot is and how it should look; the renderer draws your decision exactly inside that slot. The final \
 poster = the BASE + your slots. Keep the model's layout: every slot stays where the model drew it, at its size.
 
-AESTHETICS COME FIRST. When the draft and the prompt / client texts disagree, follow the draft. A clean, consistent, \
-well-fitted poster beats a complete one.
+AESTHETICS COME FIRST. For layout and look, follow the draft. A clean, consistent, well-fitted poster beats a complete one. \
+But the WORDS come from the client texts, never from the image.
 
 IMAGES: the message names each image. DRAFT = what the model drew. SLOTS = the draft with every slot marked (blue S#, red \
 L#, orange I#); ZOOM images are enlarged parts of it. BASE (when given) = the erased poster the renderer draws your slots on: \
@@ -349,6 +383,12 @@ crammed text gets shrunk and looks bad.
 numbers, dates, phones, addresses, emails, links) are never changed or invented -- keep them exact or leave them out. Set \
 "client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
 "missing".
+- SPELLING: copy client words character for character, with every Vietnamese diacritic. The draft's letters are often \
+wrong (TRƯỞNG or TRƯỜNG drawn for TRƯƠNG, Thứ Bẩy for Thứ Bảy): never take spelling from the image or the OCR.
+- ONCE: each client text is written once. The image model often repeats a line (the same date, price or badge label twice): \
+write it in the slot that fits it best and skip the copies. Never write a word that is in no client text inside an op that \
+claims a client text.
+- One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines.
 - Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
 same length in the poster's language (usually Vietnamese). Never copy garbled OCR. Commit; do not hedge.
 - Star ratings are always <i-stars n="..."></i-stars>, never star characters (the fonts have no star glyph).
@@ -381,6 +421,17 @@ If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
 never merge list rows into one block and never leave a bullet or icon without its text.
 - Slanted (italic / oblique) lettering in the draft stays italic; tracked (widely spaced) headlines keep their letter-spacing.
+- Weight and family: a heavy / black headline stays heavy (font-weight 800-900 in a font that has it), a script stays a \
+script font, a wide headline is never set in a condensed font (or the reverse). Unset weight = the weight measured on the draft.
+- Same role, same look: rows of one list / menu / table, the items of one card set, the labels of one badge set share ONE \
+font, size, weight and color -- write the same font-size on all of them (the smallest that fits), never one row big and the \
+next small. Left-aligned columns: "justify-content:flex-start; text-align:left" on every row so the left edges line up.
+- More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
+may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons.
+- Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
+the rest small in the small slots (Giảm / 50%; Tặng / quà); skip slots left over rather than filling them with made-up words.
+- Never a shell inside a shell: when the BASE still shows a pill / card / band behind a line, or its S# slot is drawn as a \
+shape, the text op gets NO background, border or box-shadow of its own.
 
 OUTPUT: one JSON object
 {"style": {"display_font": "<key>", "text_font": "<key>", "palette": ["#hex"], "notes": "..."},
@@ -396,8 +447,12 @@ REPAIR = """You are the same designer. The renderer drew your ops and its checke
 no op covers (unassigned -- decide them: text / icon / shape / keep / skip), content of two ops overlaps, content overflows its \
 slot, or content had to be shrunk a lot to fit (too_small: you wrote more text than the slot holds -- shorten it, keep facts \
 exact, or merge it with the next line of the same block). For each error you get the involved ops / slots (JSON) and two zoomed \
-crops: the PROOF (rendered; each involved op outlined with its id) and the MARKED draft. Fix ONLY these errors. Slots never \
-move: you change text, merging of consecutive lines, html, box_style.
+crops: the PROOF (rendered; each involved op outlined with its id) and the MARKED draft. Also: low_contrast (the text color \
+nearly matches what is really behind it -- pick a palette color with strong contrast, or add a text-shadow / outline, or \
+recreate the shell the draft had), uneven_size (lines of one role rendered at different sizes, "sizes" in px -- give them \
+all the same font-size, the smallest that fits, and the same font / weight). Never fix too_small by only lowering the \
+font-size: shorten the text or merge lines. Fix ONLY these errors. Slots never move: you change text, merging of \
+consecutive lines, html, box_style.
 
 OUTPUT one JSON object: {"patches": [{"id": "o6", "slots": [...], "kind": "...", "html": "...", "box_style": "...", "client": ...,
 "delete": false}], "why": "..."} -- a patch lists only the fields it changes; "delete": true removes that op; a patch with a NEW id
@@ -563,8 +618,8 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
     return _to_marks(call(*args))
 
 
-def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
-    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh."""
+def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, list[str]]:
+    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh. texts (câu khách): chặn chữ (_guard)."""
     log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
     by = M["by"]
     for op in P.get("ops", []):
@@ -574,7 +629,95 @@ def validate(P: dict, M: dict) -> tuple[dict, list[str]]:
         if not mk:
             continue
         ops.append({**op, "marks": mk, "slots": mk})
+    if texts:
+        ops, lg = _guard(ops, M, texts)
+        log += lg
     return {**P, "ops": ops}, log
+
+
+def _fold(s: str) -> str:
+    """Bỏ dấu tiếng Việt, chữ thường: "TRƯỞNG" == "trương" == "TRUONG"."""
+    import unicodedata
+    s = unicodedata.normalize("NFD", s.replace("đ", "d").replace("Đ", "D"))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
+
+
+def _plain(h: str) -> str:
+    import html as H
+    return " ".join(H.unescape(re.sub(r"<br\s*/?>", " ", re.sub(r"<(?!br)[^>]+>", "", h or ""))).split())
+
+
+def _tid(c) -> int | None:
+    c = str(c or "")
+    return int(c[1:]) if c[:1] in "Tt" and c[1:].isdigit() else int(c) if c.isdigit() else None
+
+
+WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], list[str]]:
+    """CHẶN CHỮ SAI bằng mã (08/10, BX 23 ảnh dev: VLM chép chữ từ ảnh nháp thay vì câu khách):
+    1. DẤU: chữ khớp một chữ của câu khách khi bỏ dấu nhưng khác dấu ("TRƯỞNG", "TRƯỜNG" cho "TRƯƠNG") -> thay bằng chữ của
+       khách (giữ hoa / thường). Chỉ xét lệnh đang viết câu khách: có "client", hoặc cả dòng (bỏ dấu) nằm trong một câu khách.
+    2. CHỮ BỊA: lệnh khai viết câu khách T# mà không chữ nào có trong bất kỳ câu khách nào ("SƯ PRING" chép từ mẩu OCR vỡ) -> skip.
+    3. LẶP: nháp hay vẽ một dòng hai lần (ngày, giá, nhãn huy hiệu); hai lệnh viết cùng một chữ (bỏ dấu, >= 3 ký tự) mà câu
+       khách không lặp -> giữ lệnh có chữ OCR của ô giống nhất, lệnh kia skip (nền xoá sạch ở đó)."""
+    from difflib import SequenceMatcher
+    log, txt = [], [t["text"] for t in texts]
+    ftxt = [" ".join(WORD.findall(_fold(t))) for t in txt]
+    vocab_all = {w for t in txt for w in WORD.findall(t)}
+    out = []
+    for op in ops:
+        if op.get("kind") != "text" or not op.get("html"):
+            out.append(op)
+            continue
+        plain = _plain(op["html"])
+        fp = " ".join(WORD.findall(_fold(plain)))
+        k = _tid(op.get("client"))
+        own = txt[k] if k is not None and 0 <= k < len(txt) else None
+        words = WORD.findall(plain)
+        if own is not None and words and not any(c.isdigit() for c in plain) and \
+                not {_fold(w) for w in words} & {_fold(w) for w in vocab_all}:
+            log.append(f"{op.get('id')}: chữ không có trong câu khách ({plain!r} khai {op.get('client')}) -> skip")
+            out.append({**op, "kind": "skip", "html": "", "why": "guard: invented text"})
+            continue
+        src = [own] if own is not None else [t for t, f in zip(txt, ftxt) if fp and f" {fp} " in f" {f} "]
+        if src:
+            cand = {}   # chữ bỏ dấu -> các dạng có dấu trong câu của lệnh
+            for t in src:
+                for w in WORD.findall(t):
+                    cand.setdefault(_fold(w), set()).add(w.lower())
+
+            def fix(m):
+                w = m.group(0)
+                opts = cand.get(_fold(w)) or set()
+                if len(opts) != 1 or w.lower() in opts:
+                    return w
+                c = next(iter(opts))
+                return c.upper() if w.isupper() else (c[:1].upper() + c[1:]) if w[:1].isupper() else c
+            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
+            new = "".join(p if p.startswith("<") or p.startswith("&") else WORD.sub(fix, p) for p in parts)
+            if new != op["html"]:
+                log.append(f"{op.get('id')}: sửa dấu theo câu khách {plain!r} -> {_plain(new)!r}")
+                op = {**op, "html": new}
+        out.append(op)
+    # 3. lặp
+    groups = {}
+    for i, op in enumerate(out):
+        if op.get("kind") == "text" and op.get("html"):
+            f = " ".join(WORD.findall(_fold(_plain(op["html"]))))
+            if len(f.replace(" ", "")) >= 3:
+                groups.setdefault(f, []).append(i)
+    for f, idx in groups.items():
+        allowed = max(1, sum(1 for t in ftxt if t == f))
+        if len(idx) <= allowed:
+            continue
+        ocr = lambda i: _fold(" ".join(M["by"][m].get("ocr", "") for m in out[i]["marks"] if m.startswith("L")))   # noqa: E731
+        idx = sorted(idx, key=lambda i: -SequenceMatcher(None, ocr(i), f).ratio())
+        for i in idx[allowed:]:
+            log.append(f"{out[i].get('id')}: lặp chữ {_plain(out[i]['html'])!r} (giữ {out[idx[0]].get('id')}) -> skip")
+            out[i] = {**out[i], "kind": "skip", "html": "", "why": "guard: duplicate"}
+    return out, log
 
 
 def repair(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[dict], prompt: str, texts: list[dict], call,
