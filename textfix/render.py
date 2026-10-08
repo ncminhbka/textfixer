@@ -381,7 +381,7 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         s.setProperty('text-shadow', 'none', 'important'); s.setProperty('-webkit-text-stroke-width', '0', 'important'); } }""")
     bg = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
     for r in res:
-        r["low"] = _low_contrast(r, bg)
+        r["low"] = _low_contrast(r, bg, img)
     return img, res, log
 
 
@@ -395,16 +395,29 @@ def _lum(rgb: np.ndarray) -> np.ndarray:
     return c @ np.array([0.2126, 0.7152, 0.0722], np.float32)
 
 
-def _low_contrast(r: dict, bg: np.ndarray) -> float | None:
-    """Phần nền (trong khung nét chữ của lệnh) mà màu chữ của lệnh chìm trên đó."""
-    m = re.match(r"rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?", r.get("fg") or "")
-    if not m or (m.group(4) is not None and float(m.group(4)) < 0.5) or r.get("empty"):
+def _low_contrast(r: dict, bg: np.ndarray, img: np.ndarray | None = None) -> float | None:
+    """Phần nền (trong khung nét chữ của lệnh) mà màu chữ của lệnh chìm trên đó. Chữ có bóng / viền / tô gradient (màu chữ
+    không đo được một màu, 08/10 h08_s1: tiêu đề vàng nhạt chìm hẳn vào nền hồng nhạt mà không bị bắt): đo trên ĐIỂM ẢNH THẬT
+    -- điểm khác nền (bản dựng so với nền không chữ) là nét chữ; phần nét chữ có tương phản < 1.5 với nền ngay dưới nó."""
+    if r.get("empty"):
         return None
     H, W = bg.shape[:2]
     x0, y0, x1, y1 = r["ink"]
     x0, y0, x1, y1 = int(max(0, x0)), int(max(0, y0)), int(min(W, x1)), int(min(H, y1))
     if x1 - x0 < 2 or y1 - y0 < 2:
         return None
+    m = re.match(r"rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?", r.get("fg") or "")
+    if r.get("fx") or not m or (m.group(4) is not None and float(m.group(4)) < 0.5):
+        if img is None:
+            return None
+        a, b = img[y0:y1, x0:x1].reshape(-1, 3).astype(np.float32), bg[y0:y1, x0:x1].reshape(-1, 3).astype(np.float32)
+        ink = np.abs(a - b).max(1) > 30
+        if ink.sum() < 20:
+            return None
+        la, lb = _lum(a[ink]), _lum(b[ink])
+        ratio = (np.maximum(la, lb) + 0.05) / (np.minimum(la, lb) + 0.05)
+        r["px_based"] = True
+        return round(float((ratio < 1.5).mean()), 2)
     lf = float(_lum(np.array([[float(m.group(i)) for i in (1, 2, 3)]])[0]))
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
     ratio = (np.maximum(lf, lb) + 0.05) / (np.minimum(lf, lb) + 0.05)
@@ -538,7 +551,7 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
         elif shrink_min and a.get("shrink", 1) < shrink_min and not a.get("evened"):   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
             errs.append({"type": "too_small", "ops": [a["id"]], "shrink": round(a["shrink"], 2)})
-        if (a.get("low") or 0) > CONTRAST_FRAC and not a.get("fx"):   # chữ chìm vào nền thật sau nó
+        if (a.get("low") or 0) > (0.6 if a.get("px_based") else CONTRAST_FRAC):   # chữ chìm vào nền thật sau nó
             errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
     errs += _uneven(P, M, res or [])
     return errs

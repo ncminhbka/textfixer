@@ -120,7 +120,9 @@ sửa gì). VLM là giám đốc nghệ thuật xem bản dựng thật: nháp, 
 ô (phóng), danh sách lệnh kèm cỡ nháp -> cỡ / độ đậm / font dựng thật, **nhật ký thay đổi của code** (chặn chữ, căn cột, cân cỡ...:
 không được đảo ngược, chỉ sửa nguyên nhân) và lỗi đo được. Trả `findings` (thấy gì) rồi `patches` (sửa html / box_style, gộp ô,
 chuyển câu sang ô khác, đổi loại ô, xoá lệnh mồ côi không mang câu khách). Giữ bản duyệt khi không viết ít câu khách hơn và không
-thêm lỗi nặng (ô bỏ sót, chồng, tràn, chìm nền) -- `slots.accept`; thẩm mỹ không đo được nên tin VLM.
+thêm lỗi nặng (ô bỏ sót, chồng, tràn, chìm nền) -- `slots.accept`; hỏng ở vài lệnh thì chỉ hoàn lại các lệnh đó
+(`slots.salvage`), xoá lệnh = skip. Qua rào đo lường rồi còn **giám khảo** (`slots.judge`): VLM so trước / sau cạnh nhau với nháp
+(thứ tự xáo), chỉ giữ bản sau khi nó đẹp hơn -- lượt 4 (08/10) cho thấy bản duyệt có thể qua rào mà xấu đi.
 
 ## Giới hạn đã biết
 

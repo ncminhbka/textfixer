@@ -123,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
             # 4. vòng duyệt (song song mỗi lượt) -> dựng lại, giữ nếu không mất câu khách / không thêm lỗi nặng (slots.accept)
             for r in range(1, slots.REVIEW_ROUNDS + 1):
                 live = [(key, st) for key, st in S.items() if st["live"]]
+                cand = []
                 for (v, k), P2, mt, err in ex.map(review, live):
                     st, x = S[(v, k)], D[k]
                     rnd = {"round": r, "meta": mt, "error": err}
@@ -145,11 +146,24 @@ def main(argv: list[str] | None = None) -> int:
                             if slots.accept(st["P"], st["errs"], P3, errs3):
                                 P2, poster2, res2, errs2, rlog2 = P3, poster3, res3, errs3, rlog3
                     if slots.accept(st["P"], st["errs"], P2, errs2):
-                        rnd["kept"] = True
-                        st.update(P=P2, poster=poster2, errs=errs2, res=res2, changes=vlog2 + rlog2)
-                        Image.fromarray(poster2).save(a.out / v / f"{k}_r{r}.jpg", quality=85)
+                        cand.append(((v, k), rnd, (P2, poster2, errs2, res2, vlog2 + rlog2)))
                     else:
                         rnd["kept"] = False
+                        st["live"] = False
+                # giám khảo (song song): bản duyệt có ĐẸP hơn bản trước không -- như engine
+                def jd(c):
+                    (v, k), rnd, new = c
+                    mt = {}
+                    better, why = slots.judge(D[k]["draft"], S[(v, k)]["poster"], new[1], vlm, meta=mt)
+                    return c, better, why, mt
+                for ((v, k), rnd, (P2, poster2, errs2, res2, ch)), better, why, mt in ex.map(jd, cand):
+                    st = S[(v, k)]
+                    rnd.update(kept=better, judge=why, judge_meta=mt)
+                    if better:
+                        st.update(P=P2, poster=poster2, errs=errs2, res=res2, changes=ch)
+                        Image.fromarray(poster2).save(a.out / v / f"{k}_r{r}.jpg", quality=85)
+                    else:
+                        Image.fromarray(poster2).save(a.out / v / f"{k}_r{r}_lost.jpg", quality=85)   # bản bị giám khảo loại, để xem
                         st["live"] = False
             for (v, k), st in S.items():
                 rec, out_P = st["rec"], st["P"]

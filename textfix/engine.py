@@ -112,6 +112,10 @@ class Engine:
                 if P2 is not P3:
                     log.append("-> bản duyệt mất câu khách / thêm lỗi nặng, giữ bản trước")
                     break
+            better, why = slots.judge(draft, poster, poster2, self.vlm)   # giám khảo: bản duyệt có ĐẸP hơn không
+            log.append(f"giám khảo: {'bản duyệt' if better else 'bản trước'} đẹp hơn ({why})")
+            if not better:
+                break
             poster, P, errs, res, changes = poster2, P2, errs2, res2, vlog2 + rlog2
             log.append("-> giữ bản đã duyệt")
         T["duyet"] = time.time() - t0

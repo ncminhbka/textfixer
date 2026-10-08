@@ -523,8 +523,8 @@ def _look(m: dict) -> str:
         # ĐỘ RỘNG CHỮ: rộng khung / (số ký tự x cỡ) -- so với độ rộng font ở danh mục (08/10: designer chọn font rộng hơn chữ nháp
         # -> phải co ~0.66, phần lớn lỗi too_small); OCR sai chữ nhưng số ký tự gần đúng
         w = (m["box"][2] - m["box"][0]) / (n * m["size"])
-        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else "")
-                   + f", fonts that wide: {', '.join(_fits(w, m))}")
+        # (08/10 lượt 4: ghi kèm tên font cùng độ rộng thì VLM đổi sang chữ condensed cả chỗ nháp là chữ thường -- bỏ)
+        out.append(f"letters ~{w:.2f}em wide" + (" (condensed)" if w < 0.45 else " (wide)" if w > 0.62 else ""))
     e = m.get("effect")
     if e:
         if abs(e.get("dx", 0)) + abs(e.get("dy", 0)) >= 1:
@@ -864,7 +864,8 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
                 dw = (L0["box"][2] - L0["box"][0]) / (len(L0["ocr"]) * L0["size"])
                 if fk in WIDTH:
                     row["rendered"]["why_small"] = (f"font {WIDTH[fk][1 if L0.get('caps') else 0] / dw:.2f}x wider than the drafted "
-                                                    f"letters; same-width fonts: {', '.join(_fits(dw, L0))}; text "
+                                                    f"letters; same-width fonts (only if their letter shape matches the draft): "
+                                                    f"{', '.join(_fits(dw, L0))}; text "
                                                     f"{len(_plain(op.get('html') or '')) / len(L0['ocr']):.2f}x the drafted length")
         rows.append(row)
     ch = [c for c in changes or [] if not c.startswith("--")]
@@ -904,6 +905,29 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
 
 REVIEW_ROUNDS = 2   # dựng -> duyệt -> dựng -> duyệt; dừng sớm khi VLM không sửa gì / bản duyệt bị loại
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
+
+
+JUDGE = """You are an art director choosing which of two finished renders of the same poster to send to the client. The DRAFT \
+shows the intended look. Pick the better poster: closer to the draft's look (type style, weight, size, colors, layout), \
+cleaner, every text easy to read, nothing cut off, overlapping, crammed, tiny or orphaned, badges / pills / buttons properly \
+filled. Judge only what you see. Reply with one JSON object: {"better": 1 or 2, "why": "a few words"}."""
+
+
+def judge(draft: np.ndarray, before: np.ndarray, after: np.ndarray, call, meta: dict | None = None) -> tuple[bool, str]:
+    """GIÁM KHẢO thẩm mỹ cho vòng duyệt (08/10 lượt 4: bản duyệt qua được rào đo lường nhưng xấu đi -- vòng tròn -50% phình
+    cắt chữ, huy hiệu lộn xộn hơn): VLM so trước / sau cạnh nhau (thứ tự xáo theo nội dung ảnh, chống thiên vị vị trí) -> True
+    khi bản SAU đẹp hơn. Lỗi / trả sai khuôn -> giữ bản sau (rào đo lường đã qua)."""
+    import hashlib
+    swap = hashlib.md5(after[::16, ::16].tobytes()).digest()[0] % 2 == 1
+    one, two = (after, before) if swap else (before, after)
+    try:
+        out = _obj(call(*((JUDGE, ["DRAFT:", _png(draft), "POSTER 1:", _png(one), "POSTER 2:", _png(two)])
+                         + ((meta,) if meta is not None else ()))))
+        b = int(str(out.get("better")).strip()[:1])
+        assert b in (1, 2)
+    except (ValueError, TypeError, AttributeError, AssertionError):
+        return True, "judge: không đọc được -> giữ bản duyệt"
+    return (b == 1) == swap, str(out.get("why") or "")[:200]
 
 
 def salvage(P: dict, errs: list[dict], P2: dict, errs2: list[dict]) -> dict | None:
