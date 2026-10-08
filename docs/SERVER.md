@@ -55,7 +55,8 @@ Lưu vào `~/textfix_env.sh` (ngoài repo, không bao giờ commit khoá), rồi
 export TEXTFIX_LLM_URL=http://<host>:<port>/v1     # LLM / VLM nội bộ (OpenAI-compatible)
 export TEXTFIX_MODEL=<tên model nhìn được ảnh>     # một model làm cả prompt FLUX lẫn designer
 export TEXTFIX_LLM_API_KEY=<khoá>
-export TEXTFIX_DEVICE_TE=cuda:1                    # bộ mã hoá chữ FLUX sang card thứ hai (đỡ OOM)
+# export TEXTFIX_GPUS=0,1                          # máy chủ: card dùng để VẼ (mặc định mọi card, mỗi card một FLUX)
+# export TEXTFIX_DESIGN_WORKERS=4                  # máy chủ: số luồng THIẾT KẾ song song (mỗi luồng một Chromium)
 export PLAYWRIGHT_CHROME_PATH=/home/jovyan/persistent-data/chrome-linux64/chrome
 ```
 
@@ -83,10 +84,18 @@ tail -f server.log
 curl -s localhost:8088/api/health          # phải thấy "ready": true
 ```
 
-Khởi động nạp FLUX, Chromium, OCR: khoảng 1 phút. Mỗi poster (distill): vẽ nháp ~2 s, xoá ~4 s, đo ô ~2 s, VLM thiết kế
-~15–30 s, vòng sửa (nếu có lỗi) ~5–15 s. Yêu cầu xếp hàng, chạy lần lượt.
+Khởi động nạp **một FLUX trên mỗi card** (song song) và OCR: khoảng 1 phút; Chromium mở khi luồng thiết kế dùng lần đầu.
 
-Kết quả: `output/runs/<run_id>/` gồm `request.json`, `brief.json`, và mỗi ảnh `v<i>/`: `draft.png`, `plate.png`, `poster.png`,
+Dây chuyền: mỗi phiên bản qua trạm VẼ (GPU: nháp ~2 s, xoá ~4 s, dọn chữ sót ~1-4 s) rồi trạm THIẾT KẾ (đo ô ~2 s, VLM
+~11 s, dựng ~2 s, vòng sửa chỉ khi có lỗi nặng ~10 s). Các phiên bản và các yêu cầu gối đầu nhau: 2 card vẽ 2 phiên bản cùng lúc,
+VLM gọi song song. Chọn nhiều ảnh: LLM viết thêm các **hướng thiết kế khác nhau** (cùng chữ khách), mỗi ảnh một hướng; ảnh xong
+trước hiện trước trên UI. 4 ảnh ~35-45 s (một ảnh ~25-30 s).
+
+UI có ô **Debug** (góc trên kết quả): nháp FLUX, bản xoá FLUX, bản xoá đã dọn, **Ô + OCR** (khung L / S / I vẽ đè lên nháp, di
+chuột xem chữ OCR đọc và lệnh designer), lệnh designer, lượt đầu trước vòng sửa, bảng OCR -> ô -> lệnh, lỗi, nhật ký.
+
+Kết quả: `output/runs/<run_id>/` gồm `request.json`, `brief.json` (kèm các hướng thiết kế), và mỗi ảnh `v<i>/`: `draft.png`,
+`plate_raw.png` (bản xoá FLUX), `plate.png` (đã dọn), `slots.jpg`, `poster.png`, `poster_first.png` (khi vòng sửa đổi),
 `steps.jpg` (nháp | ô | bản xoá | poster), `ops.jpg` (lệnh designer), `plan.json` (ô, lệnh, lỗi còn lại, nhật ký, câu thiếu,
 thời gian).
 

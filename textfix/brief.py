@@ -30,10 +30,19 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
 2. texts -- the texts the poster must show. ONLY the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). A comma-separated list of highlights / features the user wrote becomes one text per item ONLY if the user separated them; copy each item exactly.
    - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price).
+3. variants -- ALTERNATIVE DESIGN DIRECTIONS for the same poster, exactly as many as asked below (empty list when none are asked).
+   Each: name (2-4 words, e.g. "big type centered", "split photo / text", "card layout", "dark premium") and its own complete
+   prompt_en following every rule of 1. Same subject, same product, same texts (every text in double quotes, exactly the same),
+   same user style / color hints -- but a clearly DIFFERENT composition: layout (where the text block sits, centered / left /
+   split / top band / framed card), scale of the subject, background treatment, typographic mood and palette within the hints.
+   The directions must differ from prompt_en and from each other, and all must stay professional and suit the category.
 Answer only the JSON object."""
 
-SCHEMA = {"type": "object", "additionalProperties": False, "required": ["prompt_en", "texts"],
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["prompt_en", "texts", "variants"],
           "properties": {"prompt_en": {"type": "string"},
+                         "variants": {"type": "array", "items": {
+                             "type": "object", "additionalProperties": False, "required": ["name", "prompt_en"],
+                             "properties": {"name": {"type": "string"}, "prompt_en": {"type": "string"}}}},
                          "texts": {"type": "array", "items": {
                              "type": "object", "additionalProperties": False, "required": ["text", "role"],
                              "properties": {"text": {"type": "string"}, "role": {"type": "string", "enum": ROLES}}}}}}
@@ -51,8 +60,10 @@ def _norm(s: str) -> str:
 
 
 def make_brief(llm, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
-               product_image: bool = False) -> dict:
-    """llm = llm.json_call(..., schema=SCHEMA). -> {prompt_en, texts: [{text, role}], log}."""
+               product_image: bool = False, n_variants: int = 0) -> dict:
+    """llm = llm.json_call(..., schema=SCHEMA). -> {prompt_en, texts: [{text, role}], variants: [{name, prompt_en}], log}.
+    n_variants: số hướng thiết kế KHÁC (người dùng chọn nhiều ảnh: ảnh 1 = prompt_en, ảnh 2.. = các hướng này; cùng chữ khách).
+    Mỗi prompt (chính và từng hướng) qua cùng các bước giữ cam kết: bỏ tỉ lệ / độ phân giải, chữ khách thiếu ngoặc kép thì nối."""
     form = {k: v for k, v in (form or {}).items() if k not in TECH_KEYS and v not in (None, "", [], False)}
     if form.get("category") in CATEGORIES:
         form["category"] = CATEGORIES[form["category"]]
@@ -72,6 +83,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
                      "feature exactly that product (say 'the product from image 1' in prompt_en)")
     if hints:
         user.append("Design hints (not texts, never draw them as words):\n- " + "\n- ".join(hints))
+    user.append(f"Alternative design directions asked (variants): {max(0, int(n_variants))}")
     raw = llm(SYSTEM, ["\n\n".join(user)])
     sources = [_norm(prompt or "")] + [_norm(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)) for k, v in form.items()
                                        if k != "category"]
@@ -93,13 +105,27 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             out.append({"text": qn, "role": "body"})
             seen.add(qn)
             log["added"].append(qn)
-    # không tỉ lệ / độ phân giải trong prompt -- chỉ NGOÀI ngoặc kép (chữ người dùng như "8:30" giữ nguyên)
-    parts = raw.get("prompt_en", "").split('"')
+    pe, miss = _fix_prompt(raw.get("prompt_en", ""), out)
+    if miss:
+        log["quoted_added"] = miss
+    variants = []
+    for v in (raw.get("variants") or [])[:max(0, int(n_variants))]:
+        if isinstance(v, dict) and (v.get("prompt_en") or "").strip():
+            vp, vm = _fix_prompt(v["prompt_en"], out)
+            variants.append({"name": " ".join(str(v.get("name") or "").split())[:60], "prompt_en": vp})
+            if vm:
+                log.setdefault("variant_quoted_added", []).append(vm)
+    return {"prompt_en": pe, "texts": out, "variants": variants, "log": log}
+
+
+def _fix_prompt(pe: str, texts: list[dict]) -> tuple[str, list[str]]:
+    """Không tỉ lệ / độ phân giải trong prompt -- chỉ NGOÀI ngoặc kép (chữ người dùng như "8:30" giữ nguyên); chữ khách chưa nằm
+    trong ngoặc kép thì nối vào cuối (model chỉ vẽ được chữ nó thấy)."""
+    parts = pe.split('"')
     bad = re.compile(r"\b(?:1:1|9:16|16:9|4:5|5:4|2:3|3:2|4:3|3:4|21:9)\b|\b\d{3,4}p\b|\b[248]k\b", re.I)
     pe = '"'.join(bad.sub("", p) if i % 2 == 0 else p for i, p in enumerate(parts))
     have = set(QUOTED.findall(pe))
-    miss = [t["text"] for t in out if t["text"] not in have]
+    miss = [t["text"] for t in texts if t["text"] not in have]
     if miss:
         pe += " The poster shows exactly these texts: " + ", ".join(f'"{t}"' for t in miss) + "."
-        log["quoted_added"] = miss
-    return {"prompt_en": " ".join(pe.split()), "texts": out, "log": log}
+    return " ".join(pe.split()), miss

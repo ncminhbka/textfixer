@@ -74,6 +74,29 @@
   .pe { font-size: 12px; color: #3c4250; background: var(--bg); border-radius: 8px; padding: 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; }
   .timing span { display: inline-block; margin: 0 8px 4px 0; }
   a.dl { font-size: 12.5px; color: var(--accent); margin-left: auto; }
+  .bar { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+  .bar .thumbs { margin: 0; flex: 1; }
+  .dbg { font-size: 12.5px; font-weight: 600; margin: 4px 0 0; white-space: nowrap; cursor: pointer; }
+  .vcard { width: 120px; border-radius: 8px; border: 2px solid var(--line); overflow: hidden; cursor: pointer; background: var(--bg); position: relative; }
+  .vcard.on { border-color: var(--accent); }
+  .vcard img { width: 100%; height: 120px; object-fit: cover; display: block; border: 0; border-radius: 0; }
+  .vcard img.dim { opacity: .45; }
+  .vcard .ph { height: 120px; display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; font-size: 11.5px;
+               color: var(--muted); text-align: center; padding: 6px; }
+  .vcard.wait img.dim + .ph { position: absolute; top: 0; left: 0; right: 0; }
+  .vcard.err .ph { color: var(--err); font-weight: 700; }
+  .vlab { font-size: 11.5px; padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-top: 1px solid var(--line); background: var(--panel); }
+  .ocrwrap { position: relative; display: inline-block; }
+  .ocrwrap img { max-width: 100%; max-height: 78vh; display: block; }
+  .ocrwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .layers { display: flex; gap: 14px; margin-top: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  .layers label { margin: 0; font-weight: 400; }
+  .layers .hint { color: var(--muted); }
+  .dbgpanel { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 12.5px; }
+  .dbgpanel h3 { font-size: 12.5px; margin: 14px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .dbgpanel th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 6px; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: #3c4250; word-break: break-all; }
+  .muted { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -154,6 +177,7 @@
           <select id="num_images">
             <option value="1" selected>1 ảnh</option>
             <option value="2">2 ảnh</option>
+            <option value="3">3 ảnh</option>
             <option value="4">4 ảnh</option>
           </select>
         </div>
@@ -164,7 +188,7 @@
 
   <section class="card" id="out">
     <div id="status"><div class="spin" id="spin"></div><span id="msg"></span></div>
-    <div id="result"><div class="empty">Điền form rồi bấm <b>Tạo poster</b>.<br>Mỗi ảnh: LLM → FLUX vẽ nháp → FLUX xoá chữ → đọc nháp → dàn chữ đúng nguyên văn.</div></div>
+    <div id="result"><div class="empty">Điền form rồi bấm <b>Tạo poster</b>.<br>Mỗi ảnh: LLM → FLUX vẽ nháp → FLUX xoá chữ → đọc nháp → dàn chữ đúng nguyên văn.<br>Chọn nhiều ảnh: mỗi ảnh một hướng thiết kế, ảnh xong trước hiện trước.</div></div>
   </section>
 </main>
 
@@ -293,39 +317,115 @@ async function submitForm(e) {
 }
 async function poll(id) {
   for (;;) {
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1200));
     const r = await fetch(`api/jobs/${id}`), j = await r.json();
     if (!r.ok) throw new Error(j.detail || "mất job");
+    if (j.result) {   // vẽ lại chỉ khi trạng thái các phiên bản đổi (không nháy ảnh / mất chỗ cuộn mỗi lần hỏi)
+      const first = !current || current.run_id !== j.result.run_id, sig = JSON.stringify(j.result.posters.map(p => [p.status, p.stage, p.draft_url]));
+      current = j.result;
+      if (first) { picked = 0; view = "poster"; }
+      if (first || sig !== lastSig) { lastSig = sig; show(); }
+    }
     if (j.status === "queued") status(`Đang xếp hàng (trước bạn ${j.position} yêu cầu)…`, true);
     else if (j.status === "running") status(`${j.progress || "Đang chạy"} · ${Math.round(j.elapsed)}s`, true);
     else if (j.status === "error") throw new Error("Lỗi: " + j.error);
-    else { current = j.result; picked = 0; view = "poster"; status(`Xong trong ${j.result.elapsed_seconds}s · ${j.run_id}`, false); show(); return; }
+    else { status(`Xong trong ${j.result.elapsed_seconds}s · ${j.run_id}`, false); show(); return; }
   }
 }
-const VIEWS = [["poster", "Poster"], ["draft", "Nháp FLUX"], ["plate", "Bản xoá"], ["steps", "Các bước"], ["ops", "Lệnh designer"]];
+// ------------------------------------------------------------------ kết quả: ảnh hiện dần + chế độ debug
+let debug = false, lastSig = "";
+try { debug = localStorage.getItem("tf_debug") === "1"; } catch {}
+const PLANS = {}, LAYERS = { L: true, S: true, I: true };
+function setDebug(on) { debug = on; try { localStorage.setItem("tf_debug", on ? "1" : "0"); } catch {} if (!on && !["poster"].includes(view)) view = "poster"; show(); }
+const VIEWS = [["poster", "Poster", false], ["poster_first", "Lượt đầu (trước sửa)", true], ["draft", "Nháp FLUX", true],
+               ["plate_raw", "Bản xoá FLUX", true], ["plate", "Bản xoá đã dọn", true], ["ocr", "Ô + OCR", true],
+               ["ops", "Lệnh designer", true], ["steps", "Các bước", true]];
+const TN = { llm: "LLM", ve_nhap: "vẽ nháp", xoa: "xoá lớp phủ", don: "dọn chữ sót", o: "đo ô", vlm: "VLM thiết kế", dung: "dựng", duyet: "VLM sửa" };
+function thumb(p, i) {
+  const on = i === picked ? " on" : "", lab = `<div class="vlab">${i + 1}. ${esc(p.direction || "")}</div>`;
+  if (p.status === "done") return `<div class="vcard${on}" onclick="picked=${i};show()"><img src="${p.poster_url}">${lab}</div>`;
+  if (p.status === "error") return `<div class="vcard err${on}" onclick="picked=${i};show()" title="${esc(p.error)}"><div class="ph">✕ lỗi</div>${lab}</div>`;
+  return `<div class="vcard wait${on}" onclick="picked=${i};show()">${p.draft_url && debug ? `<img src="${p.draft_url}" class="dim">` : ""}` +
+    `<div class="ph"><div class="spin" style="display:block"></div><span>${esc(p.stage || "")}</span></div>${lab}</div>`;
+}
 function show() {
-  const R = current, P = R.posters[picked];
-  let h = "";
-  if (R.posters.length > 1) h += `<div class="thumbs">${R.posters.map((p, i) => p.error ? `<span class="err" title="${esc(p.error)}">✕ ảnh ${i + 1}</span>`
-    : `<img src="${p.poster_url}" class="${i === picked ? "on" : ""}" onclick="picked=${i};show()">`).join("")}</div>`;
-  if (P.error) {
-    h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(P.error)}</p>` + (P.draft_url ? `<div class="stage"><img src="${P.draft_url}"></div>` : "");
-  } else {
-    h += `<div class="views">${VIEWS.map(([k, n]) => `<button class="${k === view ? "on" : ""}" onclick="view='${k}';show()">${n}</button>`).join("")}
-          <a class="dl" href="${P[view + "_url"]}" download>Tải ảnh này</a></div>
-          <div class="stage"><img src="${P[view + "_url"]}"></div>`;
-  }
+  const R = current;
+  if (!R || !R.posters || !R.posters.length) return;
+  if (picked >= R.posters.length) picked = 0;
+  const P = R.posters[picked];
+  let h = `<div class="bar"><div class="thumbs">${R.posters.map(thumb).join("")}</div>
+           <label class="dbg"><input type="checkbox" ${debug ? "checked" : ""} onchange="setDebug(this.checked)"> Debug</label></div>`;
+  const avail = VIEWS.filter(([k, , d]) => (!d || debug) && (k === "ocr" ? P.plan_url : P[k + "_url"]));
+  if (!avail.find(([k]) => k === view)) view = avail.length ? avail[0][0] : "poster";
+  if (P.status === "error") h += `<p class="err">Ảnh ${picked + 1} lỗi: ${esc(P.error)}</p>`;
+  if (avail.length) {
+    h += `<div class="views">${avail.map(([k, n]) => `<button class="${k === view ? "on" : ""}" onclick="view='${k}';show()">${n}</button>`).join("")}
+          ${view !== "ocr" ? `<a class="dl" href="${P[view + "_url"]}" download>Tải ảnh này</a>` : ""}</div>`;
+    h += view === "ocr" ? `<div class="stage" id="ocrstage"><div class="ocrwrap"><img src="${P.draft_url}" id="ocrimg"><svg id="ocrsvg"></svg></div></div>
+           <div class="layers">${["L", "S", "I"].map(k => `<label><input type="checkbox" ${LAYERS[k] ? "checked" : ""} onchange="LAYERS['${k}']=this.checked;drawOcr()">
+           ${{ L: "L dòng chữ (OCR)", S: "S vỏ", I: "I chi tiết" }[k]}</label>`).join("")}<span class="hint">di chuột lên khung để xem OCR / lệnh</span></div>`
+         : `<div class="stage"><img src="${P[view + "_url"]}"></div>`;
+  } else if (P.status !== "error") h += `<div class="stage"><div class="empty">Ảnh ${picked + 1}: ${esc(P.stage || "đang chờ")}…</div></div>`;
   const t = P.timing || {};
-  const tn = { llm: "LLM", ve_nhap: "vẽ nháp", xoa: "xoá lớp phủ", o: "đo ô", vlm: "VLM thiết kế", dung: "dựng", sua: "VLM sửa lỗi" };
-  h += `<div class="meta"><div><h3>Chữ của khách (LLM chọn, đúng nguyên văn)</h3><table>${R.brief.texts.map(x =>
+  h += `<div class="meta"><div><h3>Chữ của khách (đúng nguyên văn)</h3><table>${R.brief.texts.map(x =>
         `<tr><td class="role">${esc(x.role)}</td><td>${esc(x.text)}</td></tr>`).join("")}</table>
-        ${P.missing && P.missing.length ? `<p class="err">Không vẽ (model không chừa chỗ, hoặc designer rút gọn): ${P.missing.map(esc).join(" · ")}</p>` : ""}
-        ${P.errors ? `<p class="err">Lỗi còn lại sau vòng sửa: ${P.errors}</p>` : ""}
-        ${P.ops !== undefined ? `<p style="font-size:12.5px;color:var(--muted)">Designer: ${P.ops} ô được vẽ lại</p>` : ""}
-        <h3 style="margin-top:12px">Thời gian (giây)</h3><div class="timing">${Object.entries(t).map(([k, v]) => `<span>${tn[k] || k}: <b>${v}</b></span>`).join("")}
-        ${P.seed !== undefined ? `<span>seed: ${P.seed}</span>` : ""}</div></div>
-        <div><h3>Prompt gửi FLUX</h3><div class="pe">${esc(R.brief.prompt_en)}</div></div></div>`;
+        ${P.missing && P.missing.length ? `<p class="err">Không vẽ: ${P.missing.map(esc).join(" · ")}</p>` : ""}
+        ${P.errors ? `<p class="err">Lỗi còn lại: ${P.errors}</p>` : ""}
+        ${Object.keys(t).length ? `<h3 style="margin-top:12px">Thời gian (giây)</h3><div class="timing">${Object.entries(t).map(([k, v]) =>
+          `<span>${TN[k] || k}: <b>${v}</b></span>`).join("")}${P.seed !== undefined ? `<span>seed: ${P.seed}</span>` : ""}${P.gpu !== undefined ? `<span>GPU ${P.gpu}</span>` : ""}</div>` : ""}</div>
+        <div><h3>Prompt gửi FLUX — ${esc(P.direction || "")}</h3><div class="pe">${esc(picked === 0 ? R.brief.prompt_en : ((R.brief.variants || [])[picked - 1] || {}).prompt_en || R.brief.prompt_en)}</div></div></div>`;
+  if (debug && P.plan_url) h += `<div id="dbgpanel" class="dbgpanel">đang tải plan.json…</div>`;
   $("result").innerHTML = h;
+  if (debug && P.plan_url) loadPlan(P).then(pl => { renderDebug(P, pl); if (view === "ocr") drawOcr(); });
+}
+async function loadPlan(P) {
+  if (!PLANS[P.plan_url]) PLANS[P.plan_url] = fetch(P.plan_url).then(r => r.json());
+  return PLANS[P.plan_url];
+}
+const KCOL = { L: "#e03131", S: "#1971c2", I: "#f08c00" };
+function plainHtml(s) { const d = document.createElement("div"); d.innerHTML = s || ""; return d.textContent; }
+async function drawOcr() {
+  const P = current.posters[picked], pl = await loadPlan(P), svg = $("ocrsvg"), img = $("ocrimg");
+  if (!svg || !img) return;
+  if (!img.complete || !img.naturalWidth) { img.onload = drawOcr; return; }
+  const [W, H] = [img.naturalWidth, img.naturalHeight];   // toạ độ ô theo ảnh nháp thật
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const owner = {};
+  (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
+  let g = "";
+  for (const k of ["S", "I", "L"]) {
+    if (!LAYERS[k]) continue;
+    for (const m of pl.slots[k] || []) {
+      const [x0, y0, x1, y1] = m.box, o = owner[m.id];
+      const tip = `${m.id}` + (m.ocr !== undefined ? ` · OCR: "${m.ocr}"` : "") + (m.size ? ` · ~${Math.round(m.size)}px` : "") +
+        (o ? ` → ${o.id} ${o.kind}${o.html ? `: ${plainHtml(o.html)}` : ""}` : " → (chưa có lệnh)");
+      g += `<g><title>${esc(tip)}</title><rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="${KCOL[k]}22" stroke="${KCOL[k]}"
+            stroke-width="${Math.max(2, W / 400)}"${o && o.kind === "skip" ? ' stroke-dasharray="8 6"' : ""}/>
+            <text x="${x0 + 3}" y="${Math.max(14, y0 - 4)}" font-size="${Math.max(14, W / 60)}" fill="${KCOL[k]}" font-weight="700">${m.id}</text></g>`;
+      if (k === "L" && m.ocr_box) {
+        const [a, b, c, d] = m.ocr_box;
+        g += `<rect x="${a}" y="${b}" width="${c - a}" height="${d - b}" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 4" pointer-events="none"/>`;
+      }
+    }
+  }
+  svg.innerHTML = g;
+}
+function renderDebug(P, pl) {
+  const el = $("dbgpanel"); if (!el) return;
+  const owner = {};
+  (pl.ops || []).forEach(o => (o.marks || o.slots || []).forEach(m => owner[m] = o));
+  const rows = (pl.slots.L || []).map(m => { const o = owner[m.id] || {};
+    return `<tr><td class="role">${m.id}</td><td>${esc(m.ocr)}</td><td>${Math.round(m.size || 0)}px</td><td class="role">${esc(o.id || "")} ${esc(o.kind || "—")}</td><td>${esc(plainHtml(o.html))}</td></tr>`; }).join("");
+  const ops = (pl.ops || []).map(o => `<tr><td class="role">${esc(o.id)}</td><td class="role">${esc(o.kind)}</td><td class="role">${esc((o.marks || o.slots || []).join(","))}</td>
+    <td>${esc(plainHtml(o.html))}</td><td class="mono">${esc(o.box_style || "")}</td><td class="muted">${esc(o.why || "")}</td></tr>`).join("");
+  const errs = (pl.errors || []).map(e => `<li>${esc(e.type)} ${esc((e.ops || []).join(","))} ${esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => !["type", "ops"].includes(k)))))}</li>`).join("");
+  const errs1 = (pl.errors_first || []).length;
+  el.innerHTML = `<h3>OCR nháp → ô → lệnh</h3><table><tr><th>ô</th><th>OCR đọc</th><th>cỡ</th><th>lệnh</th><th>viết</th></tr>${rows}</table>
+    <h3>Ô vỏ / chi tiết</h3><p class="muted">${(pl.slots.S || []).length} vỏ S, ${(pl.slots.I || []).length} chi tiết I · dọn chữ sót: ${esc(JSON.stringify(pl.cleanup || {}))}</p>
+    <h3>Lệnh designer (${(pl.ops || []).length}) · phong cách</h3><p class="mono">${esc(JSON.stringify(pl.style || {}))}</p>
+    <table><tr><th>id</th><th>loại</th><th>ô</th><th>chữ</th><th>box_style</th><th>vì sao</th></tr>${ops}</table>
+    <h3>Lỗi đo được: lượt đầu ${errs1} → cuối ${(pl.errors || []).length}</h3><ul>${errs || "<li>không</li>"}</ul>
+    <h3>Nhật ký</h3><pre class="pe">${esc((pl.log || []).join("\n"))}</pre>`;
 }
 async function health() {
   try {

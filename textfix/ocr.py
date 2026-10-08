@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import math
+import threading
 
 import numpy as np
 
-_OCR = None
+_LOCAL = threading.local()   # MỖI LUỒNG một RapidOCR (máy chủ: luồng vẽ dọn chữ sót và các luồng thiết kế đọc nháp cùng lúc)
+_LOCK = threading.Lock()     # bộ nhớ đệm dùng chung
 
 
 def _engine():
-    global _OCR
-    if _OCR is None:
+    if getattr(_LOCAL, "ocr", None) is None:
         import rapidocr_onnxruntime as ro
-        _OCR = ro.RapidOCR()
-    return _OCR
+        _LOCAL.ocr = ro.RapidOCR()
+    return _LOCAL.ocr
 
 
 MULTI_SCALE = 0.5   # lượt dò thứ hai ở ảnh thu nhỏ: chữ RẤT TO / chữ trang trí bị sót ở cỡ gốc
@@ -50,13 +51,15 @@ def read_lines(img: np.ndarray | str, multi: bool = True) -> list[dict]:
     key = None
     if isinstance(img, np.ndarray):
         key = (img.shape, multi, hashlib.md5(np.ascontiguousarray(img).tobytes()).hexdigest())
-        if key in _CACHE:
-            return copy.deepcopy(_CACHE[key])
+        with _LOCK:
+            if key in _CACHE:
+                return copy.deepcopy(_CACHE[key])
     out = _read(img, multi)
     if key is not None:
-        if len(_CACHE) >= 8:
-            _CACHE.pop(next(iter(_CACHE)))
-        _CACHE[key] = copy.deepcopy(out)
+        with _LOCK:
+            while len(_CACHE) >= 16:
+                _CACHE.pop(next(iter(_CACHE)))
+            _CACHE[key] = copy.deepcopy(out)
     return out
 
 

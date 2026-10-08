@@ -63,13 +63,15 @@ class Flux:
     """DiT + VAE + bộ mã hoá chữ nạp sẵn. Thiết bị: TEXTFIX_DEVICE_DIT / _TE / _AE (mặc định cuda:0 cả ba -- chừa cuda:1
     cho VLM vLLM). Không dùng đồng thời từ nhiều luồng (máy chủ chạy mọi việc GPU trên MỘT luồng)."""
 
-    def __init__(self, variant: str = "distill", steps: int | None = None, weights_dir: str | None = None):
+    def __init__(self, variant: str = "distill", steps: int | None = None, weights_dir: str | None = None,
+                 device: str | None = None):
+        """device: đặt CẢ BA phần lên một card (máy chủ chạy mỗi card một bản -- server/app.py), bỏ qua TEXTFIX_DEVICE_*."""
         self.variant = variant
         self.name, _, _, self.steps, self.cfg = MODELS[variant]
         self.steps = steps or self.steps
-        self.dev_dit = os.environ.get("TEXTFIX_DEVICE_DIT", "cuda:0")
-        self.dev_te = os.environ.get("TEXTFIX_DEVICE_TE", self.dev_dit)
-        self.dev_ae = os.environ.get("TEXTFIX_DEVICE_AE", self.dev_dit)
+        self.dev_dit = device or os.environ.get("TEXTFIX_DEVICE_DIT", "cuda:0")
+        self.dev_te = device or os.environ.get("TEXTFIX_DEVICE_TE", self.dev_dit)
+        self.dev_ae = device or os.environ.get("TEXTFIX_DEVICE_AE", self.dev_dit)
         self.weights = find_weights([Path(weights_dir)] if weights_dir else None)
         self.dit = self.ae = self.te = None
 
