@@ -7,6 +7,7 @@ VLM có chạy / được giữ không, thời gian từng bước -- rồi gói
   %run scripts/runs_report.py --all        # mọi lượt máy chủ còn giữ (TEXTFIX_MAX_RUNS, mặc định 300)
   %run scripts/runs_report.py --light      # chỉ plan.json + poster (nhẹ: tải nhiều lượt nhanh)
   %run scripts/runs_report.py --again      # gửi lại cả lượt đã gửi
+  %run scripts/runs_report.py --only run_a,run_b --jpg --extra m.json --name dev2   # đúng các lượt này (scripts/dev_batch.py)
 KHÔNG GỬI TRÙNG: lượt đã gửi ghi ở output/runs_zip/shipped.json, lần sau bỏ qua (tóm tắt cũng chỉ tính lượt mới). Chỉ ghi
 lượt đã XONG (mọi ảnh có nháp đều có plan.json): lượt đang chạy dở vẫn gửi, lần sau gửi lại bản đủ. server.log chỉ gửi phần
 mới từ lần trước. Zip mang tên theo giờ gói (runs_<ngày>_<giờ phút giây>_01.zip) để trình duyệt không đặt "(1)".
@@ -32,6 +33,17 @@ for _s in (sys.stdout, sys.stderr):
 SEVERE = ("unassigned", "content_overlap", "boxes_overlap", "overflow", "low_contrast", "mark_twice")
 
 
+JPG = ("poster.png", "poster_first.png", "plate_raw.png")   # --jpg: ảnh để xem; nháp + bản xoá đã dọn giữ PNG (đo ô / gán nhãn lại)
+
+
+def _jpg(src: Path, out: Path) -> Path:
+    from PIL import Image
+    out.mkdir(parents=True, exist_ok=True)
+    dst = out / (src.stem + ".jpg")
+    Image.open(src).convert("RGB").save(dst, quality=92)
+    return dst
+
+
 def _done(rd: Path) -> bool:
     """Lượt đã XONG: đủ số ảnh khách xin đều có plan.json; hoặc lượt đã im > 30 phút (hỏng giữa chừng, không chạy tiếp nữa)."""
     try:
@@ -53,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--light", action="store_true", help="chỉ plan.json + poster.png")
     ap.add_argument("--no-ship", action="store_true")
     ap.add_argument("--again", action="store_true", help="gửi lại cả lượt đã gửi")
+    ap.add_argument("--only", default="", help="chỉ các run_id này (phẩy), vd. của scripts/dev_batch.py")
+    ap.add_argument("--extra", action="append", default=[], help="tệp gói kèm (ở gốc zip), vd. manifest tập dev")
+    ap.add_argument("--jpg", action="store_true", help="poster / lượt đầu / bản xoá thô -> JPEG (nháp + bản xoá giữ PNG)")
+    ap.add_argument("--name", default="runs", help="tiền tố tên zip")
     a = ap.parse_args(argv)
     zdir = ROOT / "output" / "runs_zip"
     reg_f = zdir / "shipped.json"
@@ -62,12 +78,15 @@ def main(argv: list[str] | None = None) -> int:
         reg = {}
     shipped = set(reg.get("runs") or [])
     runs = sorted([d for d in a.runs.iterdir() if d.is_dir()], key=lambda d: d.stat().st_mtime)
+    if a.only:
+        keep = {x.strip() for x in a.only.split(",") if x.strip()}
+        runs = [d for d in runs if d.name in keep]
     if not a.again:
         old = [d for d in runs if d.name in shipped]
         runs = [d for d in runs if d.name not in shipped]
         if old:
             print(f"bỏ qua {len(old)} lượt đã gửi (--again để gửi lại)")
-    runs = runs if a.all else runs[-a.last:]
+    runs = runs if a.all or a.only else runs[-a.last:]
     if not runs:
         print("không có lượt mới")
     done = [rd.name for rd in runs if _done(rd)]
@@ -76,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     T = collections.defaultdict(list)
     files = []
     for rd in runs:
-        for f in ["request.json", "brief.json"]:
+        for f in ["request.json", "brief.json", "product.png"]:
             if (rd / f).exists():
                 files.append((rd / f, f"{rd.name}/{f}"))
         for vd in sorted(rd.glob("v*")):
@@ -106,13 +125,17 @@ def main(argv: list[str] | None = None) -> int:
             for f in (["plan.json", "poster.png"] if a.light else
                       ["plan.json", "poster.png", "poster_first.png", "draft.png", "plate_raw.png", "plate.png"]):
                 if (vd / f).exists():
-                    files.append((vd / f, f"{rd.name}/{vd.name}/{f}"))
+                    src, arc = vd / f, f"{rd.name}/{vd.name}/{f}"
+                    if a.jpg and f in JPG:
+                        src, arc = _jpg(src, zdir / "_jpg" / rd.name / vd.name), arc[:-4] + ".jpg"
+                    files.append((src, arc))
     print(f"\n{n} ảnh, sửa bằng code {cfix} (giữ {ckept}), vòng duyệt VLM {trig} (giữ {kept})")
     print("lỗi lượt đầu:", dict(first))
     print("lỗi cuối:", dict(final))
     print("thời gian trung vị:", {k: round(st.median(v), 1) for k, v in T.items()})
     if a.no_ship:
         return 0
+    files += [(Path(x), Path(x).name) for x in a.extra if Path(x).exists()]
     stamp = time.strftime("%m%d_%H%M%S")
     lf, off = ROOT / "server.log", 0 if a.again else int(reg.get("log_offset") or 0)
     size = lf.stat().st_size if lf.exists() else 0
@@ -130,7 +153,11 @@ def main(argv: list[str] | None = None) -> int:
     for g in zdir.glob("server_*.log"):
         if not files or g != files[-1][0]:
             g.unlink()
-    ship.offer(ship.pack(files, zdir, f"runs_{stamp}", group=lambda arc: arc.rsplit("/", 1)[0]))
+    for z in zdir.glob(f"{a.name}_*.zip"):
+        z.unlink()
+    ship.offer(ship.pack(files, zdir, f"{a.name}_{stamp}", group=lambda arc: arc.rsplit("/", 1)[0]))
+    import shutil
+    shutil.rmtree(zdir / "_jpg", ignore_errors=True)
     reg = {"runs": sorted(shipped | set(done)), "log_offset": size}
     reg_f.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"đã ghi {len(done)} lượt xong vào {reg_f.name}" + (f"; {len(runs) - len(done)} lượt dở sẽ gửi lại lần sau"

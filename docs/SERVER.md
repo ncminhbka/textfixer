@@ -110,6 +110,11 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 %run scripts/probe.py                          # 12 prompt bench/prompts_C.json: FLUX vẽ + xoá, VLM thật -> probe_NN.zip
 %run scripts/probe.py --only p11_distill_s4    # một ca
 %run scripts/make_pairs.py                     # cặp nháp + bản xoá cho bộ đáp án ô (docs/SLOTS_GT.md) -> pairs_NN.zip
+# máy chủ (bash scripts/start_server.sh) phải đang chạy:
+%run scripts/dev_batch.py                      # tập dev bench/dev2.json (32 yêu cầu như người dùng điền UI, 62 ảnh) qua máy chủ
+                                               # -> dev2_<giờ>_NN.zip ĐẦY ĐỦ (nháp, bản xoá, lượt đầu, poster, plan); đứt giữa
+                                               # chừng: chạy lại lệnh này = chờ tiếp job cũ, không gửi lại
+%run scripts/runs_report.py --last 5           # các lượt người dùng chạy trên giao diện (mặc định đầy đủ; --light chỉ poster)
 ```
 
 Biến môi trường trong notebook: `%env` từng biến, hoặc chạy `source ~/textfix_env.sh` trước khi mở JupyterLab.
