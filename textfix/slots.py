@@ -373,6 +373,9 @@ fill="#f5b301" empty="#d9d9d9"></i-stars>. Pick the icon from what the model dre
 package or object, a sign in the scene: its original pixels are restored).
 - L#: kind "text", slots ["L5"] or ["L5","L6"], html = the text. Or kind "keep" for text printed on a product, package, screen \
 or object in the photo (its original pixels are restored, never redraw such text), or kind "skip" for junk / duplicates.
+- "keep" is only for things printed in the photographed scene. POSTER lettering is never kept, however decorated it is \
+(a headline on a ribbon or banner, curved, 3D or metallic letters, badge and sticker text): the draft's letters are often \
+misspelt, so it is always rewritten as a text op with the client's spelling.
 - Every slot id appears in exactly ONE op -- never leave a slot out (use "skip" to drop it).
 
 TEXT
@@ -389,9 +392,14 @@ wrong (TRƯỞNG or TRƯỜNG drawn for TRƯƠNG, Thứ Bẩy for Thứ Bảy): 
 - ONCE: each client text is written once. The image model often repeats a line (the same date, price or badge label twice): \
 write it in the slot that fits it best and skip the copies. Never write a word that is in no client text inside an op that \
 claims a client text.
-- One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines.
+- One client text drawn over several stacked lines (MENU / TRÀ SỮA): one op with all those slots, <br> between the lines. \
+Read the OCR letters to find those lines even when garbled: a short slot below a line that ends its sentence ("chainn vi" \
+under "Coffee rang moc") is that text's second line, never the start of another text.
+- List items, steps and item / price rows keep the client's order and pairing (each name with its own price, steps \
+1, 2, 3 in order), even where the draft drew them in another order.
 - Text the model invented: write what it was meant to say from its role, position and the PROMPT, a natural line of about the \
-same length in the poster's language (usually Vietnamese). Never copy garbled OCR. Commit; do not hedge.
+same length in the poster's language (usually Vietnamese). Never copy garbled OCR. Commit; do not hedge. But a FACT the \
+model drew that is in no client text (an address, phone, price, date, percentage, website) is never written: skip that slot.
 - Star ratings are always <i-stars n="..."></i-stars>, never star characters (the fonts have no star glyph).
 - html: inline spans only (color / weight / italic / size for emphasis), inline CSS only, no <img>, no URLs, no scripts. Sizes \
 in px of the poster (as listed per line). The slot is a flex box centered both ways; for left-aligned text use box_style \
@@ -493,6 +501,20 @@ OUTPUT one JSON object: {"findings": [{"ops": ["o7"], "flaw": "...", "fix": "...
 (what you see), then one patch per fix; a patch lists only the fields it changes; "delete": true removes that op; a patch \
 with a NEW id (e.g. "n1") and its slots adds a new op. Empty "patches" only when the PROOF is already as good as the draft's \
 look allows."""
+
+
+def _rewritten(op: dict, ops: list[dict], patches: dict) -> bool:
+    """Chữ của lệnh op (bỏ dấu) có nằm trong một lệnh khác (sau vá) không: vòng duyệt gộp / chuyển chữ sang lệnh khác rồi mới xoá."""
+    mine = _flat(_plain(op.get("html")))
+    for o in ops + [p for p in patches.values() if p.get("id") not in {x["id"] for x in ops}]:
+        if o.get("id") == op["id"]:
+            continue
+        q = patches.get(o.get("id")) or {}
+        if q.get("delete"):
+            continue
+        if mine and mine in _flat(_plain(q.get("html", o.get("html")))):
+            return True
+    return False
 
 
 def _px(b) -> str:
@@ -894,6 +916,10 @@ def review(draft: np.ndarray, proof: np.ndarray, M: dict, P: dict, errs: list[di
     for op in P["ops"]:
         p = patches.pop(op["id"], None)
         if p is None:
+            new.append(op)
+        elif p.get("delete") and op.get("kind") == "text" and _tid(op.get("client")) is not None and op.get("html") and                 not _rewritten(op, P["ops"], patches):
+            # xoá lệnh đang viết (một phần) câu khách mà không lệnh nào khác viết lại phần đó -> không xoá (08/10 server bánh mì
+            # v1: vòng duyệt xoá dòng "Bánh Mì", poster chỉ còn "Cô Ba")
             new.append(op)
         elif p.get("delete"):   # xoá = không vẽ gì; ô vẫn đã quyết (skip), không thành "ô bỏ sót" (08/10 h08: cả lượt bị loại)
             new.append({"id": op["id"], "kind": "skip", "marks": op.get("marks") or [], "why": "review: delete"})
