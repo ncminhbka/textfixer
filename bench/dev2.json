@@ -154,5 +154,22 @@
  {"id": "d36", "tags": ["prompt_only", "no_text", "poster_without_words"],
   "why": "muốn poster nhưng không cho chữ nào -> không bịa chữ: ảnh không chữ + UI gợi ý ghi câu trong ngoặc kép",
   "request": {"category": "promo", "aspect_ratio": "4:5", "num_images": 1, "seed": 2036,
-   "prompt": "làm poster cho quán cà phê của tôi, phong cách vintage"}}
+   "prompt": "làm poster cho quán cà phê của tôi, phong cách vintage"}},
+ {"id": "d37", "tags": ["form_plus_prompt", "vague_prompt", "promo", "full"],
+  "why": "form đủ + prompt sơ sài kiểu người không biết viết prompt -> poster, mọi trường form vẫn là chữ khách",
+  "request": {"category": "promo", "title": "MUA 1 TẶNG 1", "discount": "Tặng 1 ly cùng size", "applied_product": "Trà sữa trân châu",
+   "date_start": "20/10", "date_end": "22/10/2026", "store_name": "Trà Sữa Mây", "phone": "0905 112 233",
+   "prompt": "tạo poster cho quán tôi", "aspect_ratio": "4:5", "num_images": 2, "seed": 2037}},
+ {"id": "d38", "tags": ["form_plus_prompt", "vague_prompt", "opening", "16:9"],
+  "why": "form khai trương ít trường + 'làm banner giúp' -> poster ngang, không bỏ trường form",
+  "request": {"category": "opening", "opening_date": "01/11/2026", "store_name": "Tiệm Bánh Nhà Gạo", "address": "12 Trần Phú, Đà Nẵng",
+   "prompt": "làm banner giúp mình", "aspect_ratio": "16:9", "num_images": 1, "seed": 2038}},
+ {"id": "d39", "tags": ["form_plus_prompt", "vague_prompt", "product_intro", "product_image"], "image": "bench/refs/nescafe_classic.jpg",
+  "why": "form sản phẩm + ảnh + prompt chỉ khen chung 'đẹp, sang' -> poster, prompt chỉ là gợi ý phong cách",
+  "request": {"category": "product_intro", "product_name": "Cà phê hoà tan Classic", "price": "189.000đ", "highlights": "Đậm vị, Thơm lâu, Tiện lợi",
+   "prompt": "đẹp, sang xịn vào nhé", "aspect_ratio": "1:1", "num_images": 2, "seed": 2039}},
+ {"id": "d40", "tags": ["form_plus_prompt", "vague_prompt", "recruitment", "category_mismatch"],
+  "why": "điền form tuyển dụng nhưng để loại mặc định 'promo' + prompt 'tạo poster' -> vẫn poster tuyển dụng từ các trường",
+  "request": {"category": "promo", "title": "TUYỂN NHÂN VIÊN PHA CHẾ", "store_name": "Cộng Cà Phê", "phone": "0988 765 432",
+   "prompt": "tạo poster", "aspect_ratio": "9:16", "num_images": 1, "seed": 2040}}
 ]

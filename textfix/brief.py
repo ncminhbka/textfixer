@@ -21,7 +21,7 @@ QUOTED = re.compile(r'"([^"]+)"')
 SYSTEM = """You are the copy planner and prompt engineer of a Vietnamese poster generator built on FLUX.2 by Black Forest Labs.
 Input: the user's poster form (category + filled fields, JSON) and/or a free prompt. Output ONE JSON object with:
 
-0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Never "image" when there is any user text to show.
+0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Never "image" when there is any user text to show. Most users are not prompt writers: a short vague prompt ("tạo poster", "làm banner cho quán tôi", "đẹp nhé") next to a filled form is "poster", and it never cancels the form -- every filled form field is still a text.
    For "image": texts = [], and prompt_en (and every variant) is a plain FLUX.2 image prompt following the same upsampling guidelines (subject, details, materials, lighting, mood, composition) WITHOUT poster layout and without adding any text; the rules about texts below do not apply.
 
 1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
