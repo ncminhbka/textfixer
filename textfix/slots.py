@@ -441,7 +441,9 @@ next small. Left-aligned columns: "justify-content:flex-start; text-align:left" 
 Give every op of such a set the same "group" name (e.g. "benefits", "menu-names", "menu-prices", "badges"): the renderer then \
 draws the whole group at one size, the size that fits its longest member.
 - More rows than items: the image model sometimes drew more list rows or bullets than there are client items. A long item \
-may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons.
+may continue on the next row (that row's bullet skipped); otherwise skip the extra rows AND their bullets / icons. \
+Fill the rows top to bottom in order and skip only the LAST extra rows -- never leave an empty row in the middle of a list \
+(a garbled or repeated row in the middle is just the next row of the list).
 - Badges / coins / stickers with a big middle line: put the key word or number of the client text big in the big slot and \
 the rest small in the small slots (Giảm / 50%; Tặng / quà); skip slots left over rather than filling them with made-up words.
 - Never a shell inside a shell: when the BASE still shows a pill / card / band behind a line, or its S# slot is drawn as a \
@@ -560,7 +562,9 @@ def _look(m: dict) -> str:
 
 
 def describe(M: dict) -> str:
-    sh = "\n".join(f"{s['id']}: shell {_px(s['box'])}, fill {s['fill']}, radius ~{s['radius']:.0f}px, contains "
+    sh = "\n".join(f"{s['id']}: shell {_px(s['box'])}, "
+                   + (f"outline only (no fill) {s['border']} ~{s['border_px']:.0f}px" if s.get("border") else f"fill {s['fill']}")
+                   + f", radius ~{s['radius']:.0f}px, contains "
                    f"{', '.join(s['lines'] + s['icons']) or 'nothing'}" for s in M["S"]) or "(none)"
     de = "\n".join(f"{c['id']}: detail {_px(c['box'])}, color {c['color']}" + (f", inside {c['shell']}" if c.get("shell") else "")
                    + (f", {c['near']}" if c.get("near") else "") for c in M["I"]) or "(none)"
@@ -697,6 +701,9 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
     return _to_marks(call(*args))
 
 
+PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
+
+
 def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, list[str]]:
     """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh. texts (câu khách): chặn chữ (_guard)."""
     log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
@@ -707,11 +714,32 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, l
             log.append(f"{op.get('id')}: bỏ id không có {sorted(set(op.get('marks') or []) - set(mk))}")
         if not mk:
             continue
+        # chữ / logo IN TRÊN SẢN PHẨM mà VLM cho skip (tự ghi lý do "printed logo on product") -> bản xoá đã xoá nó, skip là mất
+        # luôn (09/10 dev2 d25: con dấu trên bánh pía) -> keep (dán lại pixel nháp)
+        if op.get("kind") == "skip" and PRINTED.search(op.get("why") or "") and not re.search(r"duplicat|junk|garbl", op.get("why") or "", re.I):
+            log.append(f"{op.get('id')}: skip chữ in trên sản phẩm ({op.get('why')!r}) -> keep")
+            op = {**op, "kind": "keep"}
         ops.append({**op, "marks": mk, "slots": mk})
     if texts:
         ops, lg = _guard(ops, M, texts)
         log += lg
     return {**P, "ops": ops}, log
+
+
+def uncovered(P: dict, texts: list[dict]) -> list[int]:
+    """Câu khách KHÔNG có trên poster, đo bằng mã (09/10 dev2 d05: VLM bỏ "Thêm huyết 5.000đ" mà không khai "missing"): câu
+    có chữ (bỏ dấu, chữ thường) không nằm trong chữ của mọi lệnh viết / giữ. -> chỉ số câu."""
+    have = set()
+    for op in P.get("ops", []):
+        if op.get("kind") in ("text", "group", "shape") and op.get("html"):   # thẻ inline nối chữ ("TR<span>Ư</span>ỜNG") hoặc
+            h = op["html"]                                                        # tách cột ("<span>tên</span><span>giá</span>")
+            have |= set(WORD.findall(_fold(_plain(h)))) | set(WORD.findall(_fold(_plain(re.sub(r"<[^>]+>", " ", h)))))
+    out = []
+    for i, t in enumerate(texts):
+        w = set(WORD.findall(_fold(t["text"])))
+        if w and not w <= have:
+            out.append(i)
+    return out
 
 
 def score(P: dict, errs: list[dict]) -> tuple:
@@ -800,6 +828,19 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
             new = "".join(p if p.startswith("<") or p.startswith("&") else WORD.sub(fix, p) for p in parts)
             if new != op["html"]:
                 log.append(f"{op.get('id')}: sửa dấu theo câu khách {plain!r} -> {_plain(new)!r}")
+                op = {**op, "html": new}
+        if own is not None:
+            # 1b. CHỮ THỪA: lệnh viết câu khách mà chen chữ (chữ cái) không có trong câu khách nào -- chép chữ méo của nháp (09/10
+            #     dev2 d24: nháp "CUỐI TUÃ / TUẬN" -> "CUỐI TỬA<br>TUẦN") -> bỏ chữ đó. Số để luật 2b / câu ngắn lo.
+            fv = {_fold(w) for w in vocab_all}
+            parts = re.split(r"(<[^>]+>|&\w+;|&#\d+;)", op["html"])
+            drop = [w for p in parts if not p.startswith(("<", "&")) for w in WORD.findall(p)
+                    if not any(c.isdigit() for c in w) and _fold(w) not in fv]
+            if drop and len(drop) < len(WORD.findall(plain)):
+                new = "".join(p if p.startswith(("<", "&")) else
+                              re.sub(r"[ \t]{2,}", " ", WORD.sub(lambda m: "" if m.group(0) in drop else m.group(0), p))
+                              for p in parts)
+                log.append(f"{op.get('id')}: bỏ chữ không có trong câu khách {drop} -> {_plain(new)!r}")
                 op = {**op, "html": new}
         out.append(op)
     # 3. lặp

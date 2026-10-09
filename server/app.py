@@ -331,7 +331,8 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     n = max(1, min(4, int(req.num_images or 1)))
     job["progress"] = "LLM viết prompt" + (f" + {n - 1} hướng thiết kế" if n > 1 else "")
     t0 = time.time()
-    B = make_brief(STATE["llm"], prompt, form if len(form) > 1 else None, design_hint, product is not None, n_variants=n - 1)
+    B = make_brief(STATE["llm"], prompt, form if len(form) > 1 else None, design_hint, product is not None, n_variants=n - 1,
+                   aspect=req.aspect_ratio)
     t_llm = round(time.time() - t0, 1)
     (rd / "brief.json").write_text(json.dumps(B, ensure_ascii=False, indent=1), encoding="utf-8")
     plain = B.get("mode") == "image"   # không chữ khách: chỉ FLUX vẽ

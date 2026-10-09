@@ -19,6 +19,20 @@ DRAW = ("text", "icon", "stars", "shape", "group")
 OVERLAP = 0.1   # chồng nhau > 10% diện tích phần tử nhỏ hơn = lỗi báo cho vòng sửa
 CONDENSE = 0.85   # chữ dài hơn ô theo chiều ngang: nén ngang (scaleX) tới 0.85 TRƯỚC khi co cỡ -- chữ giữ chiều cao như nháp
 ROT_MIN = 2.0   # độ: dòng model vẽ nghiêng >= 2 độ thì dựng nghiêng đúng góc đó (dưới 2 độ là nhiễu đo của OCR)
+PARA_WORDS = 10   # đoạn văn: >= 10 chữ trên >= 3 dòng nháp -> tự ngắt dòng
+LH_ACCENT = 1.15   # line-height tối thiểu khi dòng sau có chữ hoa mang dấu trên (dấu không đâm vào dòng trên)
+EMOJI = re.compile("[\U0001F000-\U0001FAFF️‍]")   # emoji (không có font emoji trong bộ font)
+ACCENT_UP = {"̀", "́", "̃", "̉", "̂", "̆"}   # huyền sắc ngã hỏi, mũ, trăng (dấu nằm TRÊN chữ)
+
+
+def _accent_below(h: str) -> bool:
+    """HTML nhiều dòng (<br> / khối) mà một dòng SAU dòng đầu có chữ HOA mang dấu trên."""
+    import unicodedata
+    parts = re.split(r"<\s*br\b[^>]*>|<\s*/?(?:div|p|li)\b[^>]*>", h, flags=re.I)
+    lines = [re.sub(r"<[^>]+>", "", p).strip() for p in parts]
+    lines = [x for x in lines if x]
+    return any(ch.isupper() and any(c in ACCENT_UP for c in unicodedata.normalize("NFD", ch)[1:])
+               for x in lines[1:] for ch in x)
 STAR_PATH = "M50 3 L61.8 37.6 L98.1 38.2 L69.1 60.1 L79.4 95 L50 74.2 L20.6 95 L30.9 60.1 L1.9 38.2 L38.2 37.6 Z"
 
 
@@ -226,6 +240,15 @@ async (o) => {
                           `width:${e.box[2] - e.box[0]}px;height:${e.box[3] - e.box[1]}px;`) + (e.style || '');
     d.innerHTML = e.html;
     if (e.cls) d.className = e.cls;
+    // CỘT FLEX trong thẻ font: VLM viết <i-font><span style="flex:1">tên</span><span style="flex:0 0 30%">giá</span></i-font> --
+    // span bọc font (inline) là con flex duy nhất, tên và giá dính liền "Bún bò tái40.000đ" (09/10 dev2 d05) -> bọc font
+    // display:contents, các span flex thành con flex thật của khung (vẫn thừa hưởng font)
+    for (const x of d.querySelectorAll('[style*="flex"]')) {
+      // (con trực tiếp của khung flex bị "blockify": display tính ra là block, không phải inline -- xét theo thẻ span)
+      for (let p = x.parentElement; p && p !== d && p.tagName === 'SPAN' && !/flex|grid/.test(getComputedStyle(p).display);
+           p = p.parentElement)
+        p.style.display = 'contents';
+    }
     // dòng nghiêng: renderer tự xoay đúng góc đo (bên dưới) -- transform VLM ghi ở khung (rotate(-14deg)) bỏ trước khi đo,
     // không thì "đo trước khi xoay" là đo khối đã xoay (tràn / nét sai)
     if (e.angle) d.style.transform = 'none';
@@ -276,7 +299,7 @@ async (o) => {
     // NÉN NGANG trước khi co: chữ dài hơn ô (tràn ngang) -> scaleX tới o.condense, giữ cỡ chữ (chiều cao) như nháp -- co cỡ
     // làm chữ bé hẳn so với nháp (08/10 server: too_small 33 / 27 ảnh). Chỉ khối chữ dòng (không div / p / li bên trong: bọc
     // lại sẽ đổi bố cục flex của VLM); tâm nén theo căn lề của khung.
-    if (((e.fit !== 'grow' && e.fit !== 'none') || e.even) && o0[0] > 1 && !d.querySelector('div,p,ul,ol,li,table,section')) {
+    if (((e.fit !== 'grow' && e.fit !== 'none') || e.even) && o0[0] > 1 && !d.querySelector('div,p,ul,ol,li,table,section,[style*="flex"]')) {
       sx = Math.max(e.condense || o.condense, Math.min(1, m0b.width / Math.max(1, m0q.width)));
       const j = getComputedStyle(d).justifyContent;
       const org = /start|left/.test(j) ? 'left' : /end|right/.test(j) ? 'right' : 'center';
@@ -304,14 +327,22 @@ async (o) => {
     const it = e.angle ? 0 : Math.min(pad.top * fsn, (q.bottom - q.top) / 3), ib = e.angle ? 0 : Math.min(pad.bot * fsn, (q.bottom - q.top) / 3);
     // MÀU CHỮ thật (màu tính được của phần tử chứa nhiều chữ nhất) + có hiệu ứng tách nền không (bóng / viền / chữ tô gradient)
     let fg = null, fx = false, best = 0, fs = null, ff = null, fw = null;
+    const runs = [];   // từng đoạn chữ (màu / hiệu ứng riêng): khối hai màu -- "Giảm" trắng + "40%" cam trên nền đỏ (09/10 dev2 d11)
     const tw = document.createTreeWalker(d, NodeFilter.SHOW_TEXT);
     for (let t = tw.nextNode(); t; t = tw.nextNode()) {
       const n = t.textContent.trim().length, cs = getComputedStyle(t.parentElement);
-      if (cs.textShadow !== 'none' || parseFloat(cs.webkitTextStrokeWidth) > 0 || cs.backgroundClip === 'text' ||
-          cs.webkitBackgroundClip === 'text') fx = true;
+      const tfx = cs.textShadow !== 'none' || parseFloat(cs.webkitTextStrokeWidth) > 0 || cs.backgroundClip === 'text' ||
+          cs.webkitBackgroundClip === 'text';
+      if (tfx) fx = true;
       if (n > best) { best = n; fg = cs.webkitTextFillColor || cs.color; fs = parseFloat(cs.fontSize); ff = cs.fontFamily; fw = parseInt(cs.fontWeight); }
+      if (n >= 2) {
+        const rg = document.createRange(); rg.selectNodeContents(t);
+        const rc = rg.getBoundingClientRect();
+        runs.push({n, fg: cs.webkitTextFillColor || cs.color, fx: tfx,
+                   ink: [rc.left - R0.left, rc.top - R0.top, rc.right - R0.left, rc.bottom - R0.top]});
+      }
     }
-    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw, sx: +sx.toFixed(2), ink0, angle: e.angle,
+    out.push({id: e.id, size: s, shrink: e.size ? s / e.size : 1, over: m.v, o0, fg, fx, fs, ff, fw, sx: +sx.toFixed(2), ink0, angle: e.angle, runs,
               ink: [q.left - R0.left, q.top - R0.top + it, q.right - R0.left, q.bottom - R0.top - ib],
               box: [b.left - R0.left, b.top - R0.top, b.right - R0.left, b.bottom - R0.top]});
   }
@@ -376,6 +407,24 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         log += [f"{op['id']}: {x}" for x in lg]
         bs, lg = expand(bs_raw, icons, used)
         log += [f"{op['id']}: {x}" for x in lg]
+        # EMOJI: không font nào trong bộ font có hình emoji -> ô vuông (09/10 dev2 d10 "MINIGAME 🎁"); bỏ, ghi log
+        h2 = EMOJI.sub("", h)
+        if h2 != h:
+            log.append(f"{op['id']}: bỏ emoji (không có font emoji)")
+            h = h2
+        # DẤU CHỒNG DÒNG TRÊN: nhiều dòng, dòng sau có chữ HOA mang dấu trên (Á, Ỗ, Ế...) mà line-height < LH_ACCENT -> dấu đâm
+        # vào chân dòng trên (09/10 dev2 d06: "DROP MỚI<br>THÁNG 11" line-height 1.0, dấu sắc của Á thành đuôi chữ O -> "DRQP")
+        if _accent_below(h):
+            h, bs = (re.sub(r"(line-height\s*:\s*)(\d*\.?\d+)(?=\s*[;\"']|\s*$)",
+                            lambda m: m.group(1) + (str(LH_ACCENT) if float(m.group(2)) < LH_ACCENT else m.group(2)), x) for x in (h, bs))
+        # ĐOẠN VĂN (>= 3 dòng nháp, >= PARA_WORDS chữ): bỏ <br> chép theo dòng nháp, trình duyệt tự ngắt theo bề ngang khung --
+        # dòng nháp và dòng chữ thật dài khác nhau, giữ <br> thì dòng dài tự gãy thêm, một chữ mồ côi mỗi dòng ("lưng", "thể":
+        # 09/10 dev2 d17), khối phải co nhỏ cho vừa
+        if op.get("kind") == "text" and len(lm) >= 3 and len(re.sub(r"<[^>]+>", " ", h).split()) >= PARA_WORDS \
+                and re.search(r"<br", h, flags=re.I) and not re.search(r"<(div|p|li|ul|ol)\b", h, flags=re.I):
+            h = re.sub(r"\s*<\s*br\b[^>]*>\s*", " ", h, flags=re.I)
+            bs = "text-wrap:pretty;" + bs
+            log.append(f"{op['id']}: đoạn văn -- bỏ <br> theo dòng nháp, tự ngắt dòng")
         if re.search(r"text-align\s*:\s*(left|start)", bs) and "justify-content" not in bs:   # căn trái mà khối vẫn ở giữa ô
             bs += ";justify-content:flex-start"
         elif re.search(r"text-align\s*:\s*(right|end)", bs) and "justify-content" not in bs:
@@ -436,9 +485,15 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
         s.setProperty('text-shadow', 'none', 'important'); s.setProperty('-webkit-text-stroke-width', '0', 'important'); } }""")
     bg = np.asarray(Image.open(io.BytesIO(page.locator("#c").screenshot())).convert("RGB"))
     color0 = {e["id"]: e["color"] for e in els}
+    bad = lambda r: (r["low"] or 0) > (0.6 if r.get("px_based") else CONTRAST_FRAC)   # noqa: E731
     for r in res:
         r["low"] = _low_contrast(r, bg, img)
-    bad = lambda r: (r["low"] or 0) > (0.6 if r.get("px_based") else CONTRAST_FRAC)   # noqa: E731
+        if len(r.get("runs") or []) > 1 and not bad(r):   # khối nhiều màu: một đoạn chìm là lỗi dù cả khối trung bình đọc được
+            for u in r["runs"]:
+                u["low"] = _low_contrast(u, bg, img)
+                if bad(u):
+                    r["low"], r["px_based"] = u["low"], u.get("px_based", False)
+                    break
     pal = list(dict.fromkeys(r["fg"] for r in res if r.get("fg") and not bad(r)))   # màu chữ đọc tốt trên poster
     for r in res:
         if bad(r):

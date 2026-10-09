@@ -46,9 +46,9 @@ class Engine:
         self.browser.__exit__(*exc)
 
     def brief(self, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
-              product_image: bool = False, n_variants: int = 0) -> dict:
+              product_image: bool = False, n_variants: int = 0, aspect: str | None = None) -> dict:
         from .brief import make_brief
-        return make_brief(self.llm, prompt, form, design, product_image, n_variants)
+        return make_brief(self.llm, prompt, form, design, product_image, n_variants, aspect=aspect)
 
     def make(self, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = None) -> dict:
         d = draw(self.flux, B, W, H, seed, product, progress=self.progress)
@@ -173,7 +173,11 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         log.append("-> giữ bản đã duyệt")
     T["duyet"] = time.time() - t0
     tid = lambda m: int(m[1:]) if isinstance(m, str) and m[1:].isdigit() else m   # noqa: E731  "T5" -> 5
-    missing = [B["texts"][i]["text"] for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
+    miss_i = [i for i in map(tid, P.get("missing") or []) if isinstance(i, int) and 0 <= i < len(B["texts"])]
+    code_miss = [i for i in slots.uncovered(P, B["texts"]) if i not in miss_i]   # VLM bỏ câu mà không khai
+    if code_miss:
+        log.append(f"câu khách không có trên poster (đo bằng mã): {[B['texts'][i]['text'] for i in code_miss]}")
+    missing = [B["texts"][i]["text"] for i in sorted(set(miss_i) | set(code_miss))]
     plan = {"style": P.get("style"), "ops": P["ops"], "missing": missing, "notes": P.get("notes"), "errors": errs, "log": log,
             "slots": slots.public(M), "cleanup": cinfo}
     steps = _row([draft, slots.marked_image(draft, M), plate, poster])

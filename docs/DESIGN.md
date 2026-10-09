@@ -22,6 +22,11 @@ có câu khách -> `mode: poster`, chạy cả dây chuyền; không có -> `mod
 không bịa chữ). LLM nói `poster` mà không có câu khách ("làm poster cho quán của tôi"): prompt thêm "no text", UI gợi ý ghi câu
 trong ngoặc kép.
 
+Code giữ cam kết sau LLM (09/10, dev2): trường form đã điền mà không có trong câu khách (LLM viết lại thành "Apply deadline:
+15/12/2026" nên bị bỏ ở bước nguyên văn) -> thêm nguyên giá trị trường; chuỗi trong ngoặc kép (cả ngoặc cong) mà LLM dùng làm từ tả
+trong `prompt_en` ("Y2K-style", "vintage aesthetic") là phong cách, không thêm lại thành chữ; khung ảnh nói bằng lời ("wide
+horizontal landscape canvas") -- trước đây LLM viết "vertical poster" cả cho khung 16:9.
+
 ### 2. Nháp và bản xoá (`flux.py`)
 
 Nháp: FLUX.2-klein distill (4 bước); ảnh sản phẩm người dùng tải lên làm ảnh tham chiếu (FLUX giữ sản phẩm và chữ in trên đó rất
@@ -53,6 +58,10 @@ chúng).
 - **Vỏ S#**: mảng lớp phủ to (≥ 0.4% ảnh), gọn, **đặc** (≥ 80% điểm đổi: cả lòng vỏ bị xoá; chữ trần chỉ đổi nét) và **thò ra**
   ngoài khung dòng chữ ≥ 15% (nét chữ rất đậm nằm gọn trong khung dòng). Đo màu lòng (màu chiếm nhiều nhất), bo góc (khoảng hở
   góc trên đường chéo), dòng / chi tiết nằm trong.
+- **Vỏ nhạt** (09/10, dev2 6/31 ca mất pill): pill trắng trên nền kem / be chỉ khác bản xoá ΔE 10-18 (< 20). Lượt hai quanh
+  từng dòng chưa có vỏ: ngưỡng `SOFT_DIFF` = 7 trong vùng 4 × 2.5 cao dòng, mảng chứa dòng phải gọn, đặc, thò ra ngoài dòng, lòng
+  phẳng màu (lệch chuẩn ΔE <= 14), không chạm mép vùng tìm (mảng nền lớn). **Vỏ viền** (nút / khung chỉ có nét viền, lòng trong
+  suốt): đường viền kín bao trọn dòng trên mặt nạ thô (mở 5 px xoá mất nét 2-3 px), lòng không đổi -> S `fill none`, `border`.
 - **Chi tiết I#**: lớp phủ ngoài vỏ trừ chữ, và trong vỏ những điểm khác màu lòng vỏ. Bỏ mẩu lọt trong dòng / vùng dấu thanh,
   chi tiết đè lên chữ, chi tiết lồng nhau. Ghi quan hệ với dòng gần nhất (avatar cạnh tên, sao dưới tên, icon đầu dòng).
 - **Dòng L#**: OCR (RapidOCR, đa giác 4 góc, góc nghiêng) cho cấu trúc dòng, chữ giun, số ký tự (sức chứa); **khung nắn theo lớp
@@ -106,7 +115,16 @@ tiêu đề đậm thành mảnh); khoá font viết sai / tên họ font khớp
 Chặn chữ trước khi dựng (`slots.validate` + câu khách, 08/10): chữ khác câu khách chỉ ở dấu (TRƯỞNG / TRƯỜNG cho TRƯƠNG) -> thay đúng
 chữ khách; lệnh khai câu khách mà không chữ nào có trong câu khách (chép mẩu OCR vỡ) -> skip; hai lệnh cùng một chữ mà câu khách
 không lặp (nháp vẽ một dòng hai lần) -> giữ lệnh có OCR giống nhất. Câu khách ngắn (<= 3 chữ: lương, giá, nhãn) không được cắt
-bớt (vòng sửa từng bỏ "triệu" cho vừa ô) -> trả nguyên câu.
+bớt (vòng sửa từng bỏ "triệu" cho vừa ô) -> trả nguyên câu. Lệnh viết câu khách mà chen chữ không có trong câu khách nào (chép chữ
+méo của nháp: "CUỐI TỬA TUẦN", 09/10) -> bỏ chữ đó. Lệnh `skip` mà lý do ghi chữ in trên sản phẩm ("printed logo on product") ->
+`keep` (bản xoá đã xoá nó, skip là mất con dấu / nhãn). Câu khách không có trên poster được **đo bằng mã** (chữ của mọi lệnh) và
+cộng vào `missing` -- VLM hay bỏ câu mà không khai (dev2: 5 ca).
+
+Dựng (09/10, dev2): emoji bỏ (không có font emoji -> ô vuông); nhiều dòng mà dòng sau có chữ hoa mang dấu trên -> line-height
+>= 1.15 (dấu sắc của "THÁNG" đâm vào chân chữ O dòng trên thành "DRQP"); cột flex trong thẻ font (`<i-font><span flex>tên</span>
+<span flex>giá</span></i-font>`) -> thẻ bọc `display:contents` (trước: "Bún bò tái40.000đ"), khối có flex không nén ngang; đoạn
+văn (>= 3 dòng nháp, >= 10 chữ) bỏ `<br>` chép theo dòng nháp, tự ngắt (`text-wrap:pretty`) -- giữ `<br>` thì dòng dài gãy thêm,
+chữ mồ côi mỗi dòng; tương phản đo cả **từng đoạn chữ** của khối nhiều màu ("Giảm" trắng + "40%" cam trên nền đỏ).
 
 Độ rộng chữ: mỗi dòng ghi độ rộng nét chữ đo trên nháp (em / ký tự), danh mục font ghi độ rộng từng font (`fonts.WIDTH`, đo bằng
 `scripts/font_widths.py`) -- chọn font rộng hơn chữ nháp là nguyên nhân chính của too_small (08/10). Chữ tô gradient: text-shadow đổi

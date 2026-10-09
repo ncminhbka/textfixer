@@ -52,6 +52,122 @@ def _radius(m: np.ndarray) -> float:
     return float(min(g / (np.sqrt(2) - 1), min(h, w) / 2))
 
 
+SOFT_DIFF = 7.0    # VỎ NHẠT quanh dòng chữ: pill trắng trên nền kem / be chỉ khác bản xoá ΔE 10-18 (< DIFF, 09/10 dev2: 6 / 31
+                   # ca mất pill, VLM vẽ lại pill ôm sát chữ); nền không vỏ quanh chữ ΔE 1-4
+SOFT_PAD = (4.0, 2.5)   # vùng tìm quanh dòng: ngang / dọc theo cao dòng (vỏ chạm mép vùng = mảng nền lớn, không phải vỏ của dòng)
+SOFT_MIN = 0.0015       # vỏ nhạt >= 0.15% ảnh (nút "Mua ngay" nhỏ)
+SOFT_STD = 14.0         # lòng vỏ phẳng màu: độ lệch chuẩn ΔE quanh màu lòng
+SOFT_EDGE = 0.6         # bản xoá CÒN mép vỏ (độ sắc mép bản xoá / nháp dọc đường viền >= 0.6) = vỏ chưa bị xoá, không phải ô:
+                        # vỏ bị xoá 0.01-0.39 (dev2), pill bản xoá giữ chỉ nhạt màu 1.05 (gt m03_s1)
+
+
+def _edge_kept(A, B, mask, text) -> float:
+    """Độ sắc mép (Sobel trên L) của bản xoá / của nháp, dọc dải 5 px quanh đường viền vỏ (trừ chữ)."""
+    import cv2
+    m = mask.astype(np.uint8)
+    band = (cv2.dilate(m, np.ones((5, 5), np.uint8)) - cv2.erode(m, np.ones((5, 5), np.uint8))).astype(bool) & ~text
+    if band.sum() < 20:
+        return 0.0
+    def g(L):
+        L = L.astype(np.float32)
+        return float(np.hypot(cv2.Sobel(L, cv2.CV_32F, 1, 0, ksize=3), cv2.Sobel(L, cv2.CV_32F, 0, 1, ksize=3))[band].mean())
+    return g(B[..., 0]) / max(1e-3, g(A[..., 0]))
+
+
+def _ring(draft, A, lo, text, win, lb, W, H) -> dict | None:
+    """Vỏ VIỀN quanh dòng (nút / khung chỉ có nét viền, lòng trong suốt: lòng không đổi khi xoá, chỉ nét viền đổi -- 09/10 dev2
+    d02 "Shop now", d12 khung ngày): một đường viền KÍN bao trọn dòng, lòng (trừ chữ) gần như không đổi, nằm gọn trong vùng tìm."""
+    import cv2
+    X0, Y0, X1, Y1 = win
+    x0, y0, x1, y1 = lb
+    h = y1 - y0
+    t = text[Y0:Y1, X0:X1]
+    m = (lo.astype(bool) & ~t).astype(np.uint8)
+    cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for c in cnts:
+        x, y, w, hh = cv2.boundingRect(c)
+        if not (x <= x0 - X0 - 0.1 * h and y <= y0 - Y0 - 0.1 * h and x + w >= x1 - X0 + 0.1 * h and y + hh >= y1 - Y0 + 0.1 * h):
+            continue   # không bao trọn dòng
+        if x == 0 or y == 0 or x + w >= X1 - X0 or y + hh >= Y1 - Y0 or w * hh < SOFT_MIN * W * H:
+            return None
+        F = cv2.drawContours(np.zeros_like(m), [c], -1, 1, cv2.FILLED).astype(bool)
+        if F.sum() / float(w * hh) < SHELL_SOLID:
+            return None
+        k = max(3, int(0.25 * h))
+        inner = cv2.erode(F.astype(np.uint8), np.ones((2 * k + 1, 2 * k + 1), np.uint8)).astype(bool) & ~t
+        edge = F & ~cv2.erode(F.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+        if inner.sum() < max(50, 0.03 * F.sum()) or m.astype(bool)[inner].mean() > 0.15 or m.astype(bool)[edge].mean() < 0.7:
+            return None   # lòng cũng đổi (vỏ đặc -- nhánh khác lo) hoặc viền hở
+        ring = m.astype(bool) & F & ~inner
+        col = np.median(draft[Y0:Y1, X0:X1][ring], axis=0)
+        bw = float(ring.sum()) / max(1.0, cv2.arcLength(c, True))
+        sm = np.zeros((H, W), bool)
+        sm[Y0:Y1, X0:X1] = F
+        return {"box": [float(X0 + x), float(Y0 + y), float(X0 + x + w), float(Y0 + y + hh)], "fill": "none",
+                "border": "#%02x%02x%02x" % tuple(int(v) for v in col), "border_px": round(min(bw, 0.3 * h), 1),
+                "radius": round(_radius(F[y:y + hh, x:x + w]), 1), "_mask": sm,
+                "_fill_lab": np.median(A[Y0:Y1, X0:X1][inner], axis=0),   # màu NỀN trong lòng (chữ / viền = khác màu này)
+                "soft": True}
+    return None
+
+
+def _soft_shells(draft, A, B, lines, text, taken) -> list[dict]:
+    """Vỏ NHẠT (pill / thẻ màu gần nền) quanh từng dòng chưa nằm trong vỏ: lớp phủ ngưỡng thấp SOFT_DIFF, chỉ trong vùng quanh
+    dòng; mảng chứa dòng phải GỌN, ĐẶC, THÒ RA ngoài dòng, LÒNG PHẲNG MÀU và nằm gọn trong vùng tìm."""
+    import cv2
+    H, W = draft.shape[:2]
+    e = np.linalg.norm(A - B, axis=2)
+    out = []
+    for l in lines:
+        x0, y0, x1, y1 = l["box"]
+        h = y1 - y0
+        cx, cy = int((x0 + x1) / 2), int((y0 + y1) / 2)
+        if h < 6 or taken[min(H - 1, cy), min(W - 1, cx)] or any(s["_mask"][min(H - 1, cy), min(W - 1, cx)] for s in out):
+            continue
+        X0, Y0 = int(max(0, x0 - SOFT_PAD[0] * h)), int(max(0, y0 - SOFT_PAD[1] * h))
+        X1, Y1 = int(min(W, x1 + SOFT_PAD[0] * h)), int(min(H, y1 + SOFT_PAD[1] * h))
+        lo = (cv2.GaussianBlur(e[Y0:Y1, X0:X1], (0, 0), 1.0) > SOFT_DIFF).astype(np.uint8)
+        # nét viền mảnh 2-3 px: mở 5 px xoá mất -> nhánh viền dùng mặt nạ thô, chỉ đóng nhẹ cho kín
+        ring = _ring(draft, A, cv2.morphologyEx(lo, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8)), text, (X0, Y0, X1, Y1), (x0, y0, x1, y1), W, H)   # vỏ chỉ có VIỀN (lòng trong suốt)
+        lo = cv2.morphologyEx(lo, cv2.MORPH_OPEN, np.ones((OPEN, OPEN), np.uint8))
+        lo = cv2.morphologyEx(lo, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+        lo[int(y0 - Y0):int(y1 - Y0), int(x0 - X0):int(x1 - X0)] = 1   # dòng chữ thuộc vỏ
+        n, cc, st, _ = cv2.connectedComponentsWithStats(lo, 8)
+        k = cc[cy - Y0, cx - X0]
+        x, y, w, hh, area = st[k]
+        # nhỏ quá / chạm mép vùng tìm (trừ mép ảnh): mảng nền lớn / dải tràn khung, không phải vỏ đặc của riêng dòng này
+        if area < SOFT_MIN * W * H or \
+                (x == 0 and X0 > 0) or (y == 0 and Y0 > 0) or (x + w == X1 - X0 and X1 < W) or (y + hh == Y1 - Y0 and Y1 < H):
+            if ring:
+                out.append(ring)
+            continue
+        comp = (cc[y:y + hh, x:x + w] == k).astype(np.uint8)
+        cnts, _ = cv2.findContours(comp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        filled = cv2.drawContours(np.zeros_like(comp), cnts, -1, 1, cv2.FILLED).astype(bool)
+        line_box = np.zeros_like(filled)
+        line_box[max(0, int(y0 - Y0) - y):max(0, int(y1 - Y0) - y), max(0, int(x0 - X0) - x):max(0, int(x1 - X0) - x)] = True
+        if filled.sum() / float(w * hh) < SHELL_SOLID or (comp.astype(bool) & filled).mean() < SHELL_DENSE \
+                or (filled & ~line_box).sum() < SHELL_OUT * filled.sum():
+            if ring:
+                out.append(ring)
+            continue
+        sm = np.zeros((H, W), bool)
+        sm[Y0 + y:Y0 + y + hh, X0 + x:X0 + x + w] = filled
+        body = sm & ~text
+        # lòng vỏ phải BỊ XOÁ thật (bản xoá còn giữ pill, chỉ xoá chữ: chỉ quầng quanh nét đổi -- bench m03_s1)
+        if body.sum() < 0.2 * sm.sum() or np.median(e[body]) <= SOFT_DIFF:
+            continue
+        lab = A[body]
+        fill_lab = np.median(lab, axis=0)
+        if np.linalg.norm(lab - fill_lab, axis=1).std() > SOFT_STD:   # lòng loang / có hoạ tiết: cảnh, không phải vỏ
+            continue
+        fill = np.median(draft[body], axis=0)
+        out.append({"box": [float(X0 + x), float(Y0 + y), float(X0 + x + w), float(Y0 + y + hh)],
+                    "fill": "#%02x%02x%02x" % tuple(int(v) for v in fill), "radius": round(_radius(filled), 1),
+                    "_mask": sm, "_fill_lab": fill_lab, "soft": True})
+    return [s for s in out if _edge_kept(A, B, s["_mask"], text) < SOFT_EDGE]
+
+
 def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
     import cv2
     from .textmask import text_mask
@@ -100,9 +216,16 @@ def overlay(draft: np.ndarray, plate: np.ndarray, lines: list[dict]) -> dict:
                       "fill": "#%02x%02x%02x" % tuple(int(v) for v in fill), "radius": round(_radius(filled), 1),
                       "_mask": sm, "_fill_lab": _lab(fill.reshape(1, 1, 3).astype(np.uint8))[0, 0]})
             shell_mask |= sm
+    for s in _soft_shells(draft, A, B, lines, text, shell_mask):
+        s["id"] = f"S{len(S) + 1}"
+        S.append(s)
+        shell_mask |= s["_mask"]
+        ov |= s["_mask"].astype(np.uint8)
     # chi tiết nhỏ: (a) mảng lớp phủ ngoài vỏ, không phải chữ; (b) trong vỏ, khác màu lòng vỏ, không phải chữ
     cand = (ov_fine & ~text & ~shell_mask).astype(np.uint8)
     for s in S:
+        if s.get("border"):   # vỏ viền: lòng là nền ảnh, không tìm chi tiết trong lòng
+            continue
         inner = s["_mask"] & ~text & ov_fine & (np.linalg.norm(A - s["_fill_lab"], axis=2) > INNER_DE)
         inner = cv2.erode(s["_mask"].astype(np.uint8), np.ones((7, 7), np.uint8)).astype(bool) & inner   # bỏ viền / bóng mép vỏ
         cand |= inner.astype(np.uint8)

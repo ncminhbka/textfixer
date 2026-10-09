@@ -17,6 +17,19 @@ ROLES = ["headline", "subheadline", "body", "price", "old_price", "offer", "date
          "review_quote", "review_name", "label"]
 TECH_KEYS = {"image_base64", "seed", "num_images", "aspect_ratio", "primary_color", "style_pref", "has_product_image"}
 QUOTED = re.compile(r'"([^"]+)"')
+CURLY = re.compile(r"“([^”]+)”")   # ngoặc kép cong (gõ trên điện thoại / Word)
+# vai mặc định của trường form (thêm lại trường LLM bỏ sót)
+FIELD_ROLE = {"title": "headline", "discount": "offer", "applied_product": "subheadline", "date_start": "date", "date_end": "date",
+              "product_name": "headline", "product_desc": "subheadline", "highlights": "list_item", "price": "price",
+              "opening_date": "date", "opening_promo": "offer", "booking_contact": "contact", "feedback_target": "label",
+              "feedback_quote": "review_quote", "customer_name": "review_name", "feedback_highlights": "list_item",
+              "special_offer": "offer", "job_position": "headline", "job_desc": "body", "apply_deadline": "date",
+              "apply_method": "contact", "guide_steps": "list_item", "store_name": "info", "phone": "contact",
+              "address": "contact", "website_link": "contact"}
+# khung ảnh (tỉ lệ người dùng chọn) bằng lời: LLM mặc định "vertical poster" cả khi khung ngang (09/10 dev2 d16, d32 16:9)
+ORIENT = {"1:1": "a square canvas", "4:5": "a portrait (slightly tall) canvas", "3:4": "a portrait canvas",
+          "9:16": "a tall vertical canvas (phone story)", "16:9": "a wide horizontal landscape canvas (web banner)",
+          "4:3": "a landscape canvas", "2:3": "a tall portrait canvas"}
 
 SYSTEM = """You are the copy planner and prompt engineer of a Vietnamese poster generator built on FLUX.2 by Black Forest Labs.
 Input: the user's poster form (category + filled fields, JSON) and/or a free prompt. Output ONE JSON object with:
@@ -64,7 +77,7 @@ def _norm(s: str) -> str:
 
 
 def make_brief(llm, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
-               product_image: bool = False, n_variants: int = 0) -> dict:
+               product_image: bool = False, n_variants: int = 0, aspect: str | None = None) -> dict:
     """llm = llm.json_call(..., schema=SCHEMA). -> {mode, prompt_en, texts: [{text, role}], variants: [{name, prompt_en}], log}.
     mode: "poster" (có câu khách -> cả dây chuyền) | "image" (không chữ khách -> chỉ FLUX vẽ, trả nháp).
     n_variants: số hướng thiết kế KHÁC (người dùng chọn nhiều ảnh: ảnh 1 = prompt_en, ảnh 2.. = các hướng này; cùng chữ khách).
@@ -86,14 +99,19 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     if product_image:
         hints.append("the user uploaded a photo of their product, given to the image model as reference image 1: the poster must "
                      "feature exactly that product (say 'the product from image 1' in prompt_en)")
+    if aspect in ORIENT:
+        hints.append(f"canvas: {ORIENT[aspect]} -- compose the whole layout for this shape and describe it with words like "
+                     "horizontal / vertical / square, never as a ratio")
     if hints:
         user.append("Design hints (not texts, never draw them as words):\n- " + "\n- ".join(hints))
     user.append(f"Alternative design directions asked (variants): {max(0, int(n_variants))}")
     raw = llm(SYSTEM, ["\n\n".join(user)])
     sources = [_norm(prompt or "")] + [_norm(v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)) for k, v in form.items()
                                        if k != "category"]
-    must = list(dict.fromkeys(QUOTED.findall(prompt or "")))
+    must = list(dict.fromkeys(QUOTED.findall(prompt or "") + CURLY.findall(prompt or "")))
     out, log, seen = [], {"dropped": [], "added": []}, set()
+    pe_raw = raw.get("prompt_en", "")
+    pe_open = QUOTED.sub(" ", pe_raw).casefold()   # prompt_en ngoài các chuỗi trong ngoặc kép
     for t in raw.get("texts", []):
         text = _norm(t.get("text", ""))
         if not text or text in seen:
@@ -109,9 +127,29 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
         qn = _norm(q)
         parts = [t for t in seen if t in qn]
         if qn not in seen and not (parts and sum(len(p) for p in parts) >= 0.8 * len(qn)):
+            # LLM dùng chuỗi đó làm TỪ TẢ trong prompt_en (không ngoặc kép): khách đặt ngoặc cho phong cách, không phải chữ in
+            # (09/10 dev2 d06: phong cách "Y2K", "vintage" -> "Y2K-style t-shirt with a vintage aesthetic") -> không thêm lại
+            if re.search(r"(?<!\w)" + re.escape(qn.casefold()) + r"(?!\w)", pe_open):
+                log.setdefault("quoted_as_style", []).append(qn)
+                continue
             out.append({"text": qn, "role": "body"})
             seen.add(qn)
             log["added"].append(qn)
+    # TRƯỜNG FORM đã điền mà không có trong câu khách (LLM viết lại thành câu khác -- "Apply deadline: 15/12/2026" -- nên bị bỏ ở
+    # bước nguyên văn, 09/10 dev2 d32 mất hạn nộp) -> thêm nguyên giá trị trường
+    for k, v in form.items():
+        if k == "category":
+            continue
+        for x in (v if isinstance(v, list) else [v]):
+            xn = _norm(str(x))
+            if not xn or any(xn.casefold() in t.casefold() for t in seen):
+                continue
+            parts = [t for t in seen if t.casefold() in xn.casefold()]
+            if parts and sum(len(p) for p in parts) >= 0.8 * len(xn):   # đã tách thành các ý / các dòng
+                continue
+            out.append({"text": xn, "role": FIELD_ROLE.get(k, "info")})
+            seen.add(xn)
+            log.setdefault("form_added", []).append(xn)
     pe, miss = _fix_prompt(raw.get("prompt_en", ""), out)
     gone = _quoted_extra(raw.get("prompt_en", ""), out)
     if gone:
