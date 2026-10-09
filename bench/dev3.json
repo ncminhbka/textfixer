@@ -1,0 +1,738 @@
+[
+ {
+  "id": "g01",
+  "tags": [
+   "typography",
+   "arc_top",
+   "badge"
+  ],
+  "why": "tiêu đề uốn vòng cung lồi phía trên huy hiệu tròn",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3001,
+   "prompt": "Poster khuyến mãi mỹ phẩm, huy hiệu tròn lớn màu hồng ở giữa, tiêu đề \"SIÊU SALE CUỐI TUẦN\" uốn cong theo vòng cung phía trên huy hiệu, trong huy hiệu \"GIẢM 50%\", dưới cùng \"Chỉ 3 ngày 15 - 17/11\"."
+  }
+ },
+ {
+  "id": "g02",
+  "tags": [
+   "typography",
+   "circle_stamp",
+   "arc_both"
+  ],
+  "why": "chữ chạy vòng quanh con dấu tròn (cung trên + cung dưới)",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3002,
+   "prompt": "Logo con dấu tròn cổ điển cho tiệm bánh, chữ \"TIỆM BÁNH NHÀ GẠO\" chạy vòng theo mép trên con dấu, chữ \"TỪ 2015\" chạy vòng theo mép dưới, giữa con dấu hình ổ bánh mì, nền giấy kraft."
+  }
+ },
+ {
+  "id": "g03",
+  "tags": [
+   "typography",
+   "arc_top",
+   "rainbow",
+   "opening"
+  ],
+  "why": "tiêu đề cong hình cầu vồng phía trên mặt tiền cửa hàng",
+  "request": {
+   "category": "opening",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3003,
+   "prompt": "Poster khai trương quán trà sữa, mặt tiền quán xinh xắn có bóng bay, tiêu đề lớn \"KHAI TRƯƠNG\" uốn cong như cầu vồng phía trên, bên dưới \"Trà Sữa Mây\" và \"Mua 1 tặng 1 ngày 20/11\"."
+  }
+ },
+ {
+  "id": "g04",
+  "tags": [
+   "typography",
+   "arc_bottom",
+   "smile"
+  ],
+  "why": "chữ cong lõm (hình nụ cười) dưới sản phẩm",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3004,
+   "prompt": "Poster bánh donut phủ socola trên nền vàng, dòng chữ \"NGON KHÓ CƯỠNG\" uốn cong lõm như nụ cười ngay dưới chiếc bánh, góc trên \"Donut Hạnh Phúc\", dưới cùng \"Chỉ 15K / chiếc\"."
+  }
+ },
+ {
+  "id": "g05",
+  "tags": [
+   "typography",
+   "diagonal_ribbon",
+   "corner"
+  ],
+  "why": "dải ruy băng chéo ở góc có chữ nghiêng 45 độ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3005,
+   "prompt": "Poster giày chạy bộ trên nền xanh dương, dải ruy băng đỏ chéo góc trên bên phải ghi \"GIẢM 30%\", tiêu đề \"CHẠY NHANH HƠN\" bên trái, dưới cùng \"Sport Zone - 0909 123 456\"."
+  }
+ },
+ {
+  "id": "g06",
+  "tags": [
+   "typography",
+   "tilted_sticker",
+   "small_angle"
+  ],
+  "why": "nhãn dán nghiêng nhẹ (10-15 độ) cạnh sản phẩm",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3006,
+   "prompt": "Poster tai nghe không dây màu trắng, nhãn dán tròn màu vàng nghiêng ghi \"HÀNG MỚI VỀ\", tiêu đề \"Âm thanh thuần khiết\", giá \"1.290.000đ\", nhãn nhỏ nghiêng \"HOT\" ở góc."
+  }
+ },
+ {
+  "id": "g07",
+  "tags": [
+   "typography",
+   "diagonal_headline",
+   "dynamic"
+  ],
+  "why": "cả khối tiêu đề nghiêng chéo mạnh, phong cách năng động",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "num_images": 2,
+   "seed": 3007,
+   "style_pref": "nang_dong",
+   "prompt": "Poster flash sale điện thoại, tia sét và chuyển động, tiêu đề \"FLASH SALE\" nghiêng chéo lên mạnh, dòng nghiêng \"Chỉ hôm nay 12h - 14h\", giá \"Từ 2.990.000đ\"."
+  }
+ },
+ {
+  "id": "g08",
+  "tags": [
+   "typography",
+   "mixed_size",
+   "same_line",
+   "number_big"
+  ],
+  "why": "một dòng hai cỡ: chữ GIẢM nhỏ, số 50% rất to, cùng đường chân",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3008,
+   "prompt": "Poster sale thời trang nữ, nền be, trên cùng một dòng chữ \"GIẢM\" nhỏ đứng cạnh con số \"50%\" cực lớn, bên dưới \"Toàn bộ váy mùa thu\" và \"Từ 1 - 5/11\"."
+  }
+ },
+ {
+  "id": "g09",
+  "tags": [
+   "typography",
+   "mixed_size",
+   "price",
+   "superscript"
+  ],
+  "why": "giá: 'Chỉ' nhỏ, '99K' to, '/hộp' nhỏ cùng dòng",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3009,
+   "prompt": "Poster hộp cơm trưa văn phòng, tiêu đề \"CƠM NGON GIAO TẬN NƠI\", dòng giá gồm chữ \"Chỉ\" nhỏ, số \"99K\" thật to và \"/hộp\" nhỏ nằm cùng một dòng, cuối \"Gọi 0912 888 777\"."
+  }
+ },
+ {
+  "id": "g10",
+  "tags": [
+   "typography",
+   "mixed_size",
+   "date_big"
+  ],
+  "why": "ngày tháng: số to, chữ nhỏ cùng dòng",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "num_images": 2,
+   "seed": 3010,
+   "prompt": "Poster sự kiện âm nhạc, ánh đèn sân khấu tím, tiêu đề \"ĐÊM NHẠC MÙA ĐÔNG\", dòng ngày gồm chữ \"Thứ Bảy\" nhỏ và \"21.12\" rất to cùng một dòng, dưới \"Nhà hát Hoà Bình\"."
+  }
+ },
+ {
+  "id": "g11",
+  "tags": [
+   "typography",
+   "wavy",
+   "playful"
+  ],
+  "why": "chữ lượn sóng / nhấp nhô vui nhộn",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3011,
+   "style_pref": "le_hoi",
+   "prompt": "Poster tiệc hè bãi biển, phao bơi và nước, tiêu đề \"MÙA HÈ SÔI ĐỘNG\" chữ lượn sóng nhấp nhô vui nhộn, dưới \"Pool Party 25/6\" và \"Vé 199K\"."
+  }
+ },
+ {
+  "id": "g12",
+  "tags": [
+   "typography",
+   "arc_bottom",
+   "badge"
+  ],
+  "why": "chữ chạy theo cung dưới của huy hiệu tròn",
+  "request": {
+   "category": "product_intro",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3012,
+   "prompt": "Poster nồi chiên không dầu, huy hiệu tròn màu xanh lá có dấu tích, chữ \"BẢO HÀNH 24 THÁNG\" chạy cong theo mép dưới huy hiệu, tiêu đề \"Nồi chiên Smart 6L\", giá \"2.190.000đ\"."
+  }
+ },
+ {
+  "id": "g13",
+  "tags": [
+   "typography",
+   "staggered",
+   "rotated_words"
+  ],
+  "why": "các từ xếp so le, mỗi từ nghiêng một góc khác",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3013,
+   "prompt": "Poster salad rau củ tươi, chữ \"ĂN NGON\" và \"SỐNG KHOẺ\" xếp so le, mỗi chữ nghiêng một góc khác nhau kiểu cắt dán, góc dưới \"Green Bowl\" và \"Giao nhanh 30 phút\"."
+  }
+ },
+ {
+  "id": "g14",
+  "tags": [
+   "typography",
+   "mixed_size",
+   "mixed_font",
+   "same_line"
+  ],
+  "why": "cùng dòng: chữ viết tay nhỏ + chữ in hoa to",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 3014,
+   "style_pref": "sang_trong",
+   "prompt": "Poster bộ sưu tập túi xách, lá phong mùa thu, trên một dòng chữ viết tay nhỏ \"Ưu đãi\" đứng trước chữ in hoa rất to \"MÙA THU\", dưới \"Giảm 25% toàn bộ túi da\"."
+  }
+ },
+ {
+  "id": "g15",
+  "tags": [
+   "typography",
+   "arc_ribbon"
+  ],
+  "why": "ruy băng uốn cong có chữ cong theo",
+  "request": {
+   "category": "feedback",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 3015,
+   "prompt": "Poster tri ân khách hàng, hộp quà và hoa, ruy băng đỏ uốn cong có chữ \"QUÀ TẶNG TRI ÂN\" cong theo ruy băng, bên dưới \"Cảm ơn bạn đã đồng hành\" và \"Shop Hoa Mai\"."
+  }
+ },
+ {
+  "id": "g16",
+  "tags": [
+   "typography",
+   "diagonal_headline",
+   "16:9",
+   "mixed_size"
+  ],
+  "why": "banner ngang, khối chữ nghiêng, số % to hơn chữ cùng dòng",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "num_images": 2,
+   "seed": 3016,
+   "prompt": "Banner ngang mùa tựu trường, cặp sách và bút màu, tiêu đề \"BACK TO SCHOOL\" nghiêng nhẹ, dòng \"Giảm đến 40%\" với số \"40%\" to hơn hẳn, góc phải \"Nhà sách Hồng Hà\"."
+  }
+ },
+ {
+  "id": "p01",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "gym",
+   "curly_quotes",
+   "stars",
+   "before_after"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 4001,
+   "prompt": "Tạo ảnh feedback khách hàng cho dịch vụ gym & PT cao cấp. Tiêu đề: “Khách hàng nói gì sau 90 ngày thay đổi?”. Tên sản phẩm/dịch vụ nhận feedback: “Private Coaching Transformation”. Mô tả ngắn feedback: “97% khách hàng hài lòng với kết quả tăng cơ, cải thiện vóc dáng và sức khỏe chỉ sau 3 tháng tập luyện cùng PT riêng”. Điểm nổi bật của sản phẩm/dịch vụ: “PT 1:1 riêng tư, giáo án cá nhân hóa, theo dõi dinh dưỡng và form tập chi tiết”. Ưu đãi đặc biệt: “Giảm 20% gói PT tháng đầu cho khách hàng mới”. Thiết kế phong cách fitness premium hiện đại, background phòng gym sang trọng, hiển thị review 5 sao và hình ảnh khách hàng before/after, tone đen đỏ mạnh mẽ, typography nổi bật, ánh sáng cinematic, bố cục chuyên nghiệp như quảng cáo fitness trên Facebook/Instagram, ultra realistic, high detail."
+  }
+ },
+ {
+  "id": "p02",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "pet_spa",
+   "stars",
+   "before_after"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 4002,
+   "prompt": "Tạo ảnh feedback khách hàng cho dịch vụ Spa thú cưng cao cấp. Tiêu đề: \"Boss lột xác thế nào sau 2 giờ tại Spa?\". Tên dịch vụ: \"Premium Pet Grooming & Spa\". Mô tả ngắn: \"100% các bé cún/mèo trở nên thơm tho, bồng bềnh và thư giãn hoàn toàn sau combo spa 7 bước\". Điểm nổi bật: \"Sử dụng sữa tắm hữu cơ, cắt tỉa chuẩn form Hàn Quốc, không gian không lồng kính giúp giảm stress\". Ưu đãi: \"Tặng gói ngâm sục Ozon trị giá 200k cho lần đầu trải nghiệm\". Thiết kế phong cách pet care dễ thương nhưng cao cấp, background tiệm spa thú cưng tone pastel (hồng và xanh mint) sáng sủa. Hiển thị review 5 sao và hình ảnh chú chó Poodle chia đôi before/after siêu đáng yêu. Typography bo tròn thân thiện, ánh sáng studio rực rỡ, bố cục tối ưu cho mạng xã hội, ultra realistic, 8k."
+  }
+ },
+ {
+  "id": "p03",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "glamping",
+   "stars"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 4003,
+   "prompt": "Tạo ảnh quảng cáo feedback khách hàng cho khu nghỉ dưỡng cắm trại sang trọng. Tiêu đề: \"Trải nghiệm chữa lành giữa thiên nhiên tuyệt mỹ\". Tên sản phẩm/dịch vụ: \"Cloud Retreat Glamping\". Mô tả ngắn: \"98% khách hàng đánh giá đây là điểm đến lý tưởng để tái tạo năng lượng, rời xa khói bụi thành phố dịp cuối tuần\". Điểm nổi bật: \"Lều Dome view săn mây 360 độ, BBQ riêng tư tại lều, rạp chiếu phim ngoài trời và lửa trại ấm cúng\". Ưu đãi: \"Giảm 30% khi đặt phòng sớm trước 14 ngày\". Thiết kế phong cách du lịch nghỉ dưỡng cao cấp, background là khu lều glamping phát sáng giữa rừng thông buổi hoàng hôn. Hiển thị review 5 sao cùng hình ảnh cặp đôi đang cụng ly rượu vang ấm áp. Tone màu cam ấm và xanh rêu mộc mạc, typography thanh lịch, ánh sáng cinematic kịch tính, photorealistic, high detail."
+  }
+ },
+ {
+  "id": "p04",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "furniture",
+   "stars"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "num_images": 2,
+   "seed": 4004,
+   "prompt": "Tạo ảnh quảng cáo feedback cho sản phẩm nội thất thông minh. Tiêu đề: \"Định nghĩa lại sự thư giãn tại phòng khách\". Tên sản phẩm: \"Sofa Chỉnh Điện Smart Zen\". Mô tả ngắn: \"Khách hàng hoàn toàn bị chinh phục bởi độ êm ái và tính năng massage tích hợp, biến phòng khách thành rạp phim tại gia\". Điểm nổi bật: \"Da bò Ý thật 100%, ngả lưng không trọng lực 170 độ, tích hợp sạc không dây và loa bluetooth\". Ưu đãi: \"Tặng bàn trà mặt đá cao cấp khi chốt đơn trong tháng\". Thiết kế phong cách nội thất châu Âu tối giản và sang trọng, background là phòng khách penthouse view thành phố về đêm. Hiển thị đánh giá 5 sao. Hình ảnh người đàn ông đang nằm ngả lưng thư giãn nhắm mắt tận hưởng. Tone màu nâu da bò và xám lông chuột quyền lực, typography hiện đại, ánh sáng softbox êm dịu, ultra realistic."
+  }
+ },
+ {
+  "id": "p05",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "kombucha",
+   "stars",
+   "before_after"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "num_images": 1,
+   "seed": 4005,
+   "prompt": "Tạo ảnh feedback khách hàng cho thức uống sức khỏe. Tiêu đề: \"Vòng eo thon gọn, cơ thể nhẹ tênh chỉ sau 14 ngày\". Tên sản phẩm: \"Detox Kombucha Premium\". Mô tả ngắn: \"Hơn 5000 chị em đã lấy lại vóc dáng tự tin, cải thiện tiêu hóa và da sáng mịn màng với liệu trình Kombucha tươi\". Điểm nổi bật: \"Lên men tự nhiên 30 ngày, 0 đường tinh luyện, bổ sung 1 tỷ lợi khuẩn Probiotics, vị trái cây nhiệt đới dễ uống\". Ưu đãi: \"Mua liệu trình 14 ngày tặng ngay bình giữ nhiệt cao cấp\". Thiết kế phong cách healthy & fresh, background là trái cây tươi và lá bạc hà mát mẻ có hiệu ứng splash nước. Hiển thị review 5 sao, hình ảnh cô gái trẻ mặc đồ thể thao cầm chai Kombucha cười rạng rỡ, góc ảnh có chèn ảnh before/after vòng eo nhỏ gọn. Tone màu xanh lá và cam đào tươi tắn, typography năng động, ánh sáng tự nhiên rực rỡ, hyper realistic."
+  }
+ },
+ {
+  "id": "p06",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "english_course",
+   "stars"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 4006,
+   "prompt": "Tạo ảnh feedback học viên cho khóa học ngoại ngữ. Tiêu đề: \"Đập tan rào cản tiếng Anh, tự tin thăng tiến\". Tên dịch vụ: \"Khóa học Giao Tiếp Phản Xạ Độc Quyền\". Mô tả ngắn: \"Hàng ngàn dân công sở đã tự tin thuyết trình và đàm phán trực tiếp với đối tác nước ngoài chỉ sau 3 tháng thực chiến\". Điểm nổi bật: \"Học 1 kèm 1 với giáo viên bản xứ, lộ trình cá nhân hóa theo ngành nghề, phương pháp ám thị ngôn ngữ không ghi chép\". Ưu đãi: \"Tặng buổi test năng lực chuẩn Cambridge và voucher 1 triệu đồng\". Thiết kế phong cách giáo dục chuyên nghiệp, hiện đại, background môi trường văn phòng quốc tế. Hiển thị đánh giá 5 sao và hình ảnh học viên mặc vest đang vui vẻ bắt tay đối tác Tây. Tone màu xanh dương đậm và vàng gold uy tín, typography to rõ dễ đọc, ánh sáng studio sắc nét, photorealistic."
+  }
+ },
+ {
+  "id": "p07",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "cleaning",
+   "stars",
+   "before_after",
+   "split_bg"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 4007,
+   "prompt": "Tạo ảnh quảng cáo dịch vụ tiện ích gia đình. Tiêu đề: \"Trả lại không gian sống sạch bong, thơm mát\". Tên dịch vụ: \"Deep Cleaning Home Service\". Mô tả ngắn: \"Khách hàng ngỡ ngàng khi nhận lại căn nhà sạch không tì vết, diệt khuẩn 99% mọi ngóc ngách khó nhằn nhất\". Điểm nổi bật: \"Đội ngũ nhân viên được đào tạo chuẩn khách sạn 5 sao, sử dụng hóa chất sinh học an toàn cho trẻ nhỏ, có bảo hành dịch vụ\". Ưu đãi: \"Giảm ngay 20% cho khách hàng đặt lịch dọn dẹp tổng thể cuối tuần\". Thiết kế phong cách sạch sẽ, tươi sáng và tin cậy, background chia đôi một nửa bừa bộn bụi bặm, một nửa sạch bóng lấp lánh (Before/After). Hiển thị review 5 sao, hình ảnh nhân viên mặc đồng phục gọn gàng đang mỉm cười lau dọn bằng máy móc hiện đại. Tone màu trắng và xanh dương nhạt (cyan), typography nổi bật, ánh sáng trong trẻo."
+  }
+ },
+ {
+  "id": "p08",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "fintech",
+   "stars",
+   "mockup"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 4008,
+   "prompt": "Tạo ảnh quảng cáo cho ứng dụng công nghệ tài chính. Tiêu đề: \"Quản lý chi tiêu thông minh, tiền đẻ ra tiền\". Tên sản phẩm: \"WealthMaster App\". Mô tả ngắn: \"Người dùng đã tiết kiệm được 30% thu nhập mỗi tháng nhờ hệ thống cảnh báo chi tiêu và AI phân tích danh mục đầu tư tự động\". Điểm nổi bật: \"Đồng bộ giao dịch tự động từ 50+ ngân hàng, lập ngân sách bằng AI, bảo mật chuẩn quân đội, giao diện trực quan\". Ưu đãi: \"Miễn phí nâng cấp tài khoản Premium 6 tháng khi tải app hôm nay\". Thiết kế phong cách công nghệ fintech hiện đại, tối giản. Background là các biểu đồ tài chính tăng trưởng mờ ảo màu xanh lá, hiển thị đánh giá 5 sao từ App Store. Hình ảnh mockup điện thoại iPhone hiển thị giao diện app 3D siêu thực, bên cạnh là một người trẻ thành đạt đang mỉm cười. Tone màu xanh navy đậm, typography digital sắc nét, ánh sáng neon nhẹ."
+  }
+ },
+ {
+  "id": "p09",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "kitchen",
+   "stars"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 4009,
+   "prompt": "Tạo ảnh feedback khách hàng cho thiết bị nhà bếp. Tiêu đề: \"Món nướng ngoài giòn trong mọng nước, mẹ nhàn tênh\". Tên sản phẩm: \"Nồi Chiên Hơi Nước ChefPro 15L\". Mô tả ngắn: \"Các bà nội trợ cực kỳ hài lòng vì đồ ăn không bị khô khốc như nồi cũ, giữ trọn vẹn dinh dưỡng và dễ dàng vệ sinh nhờ chế độ tự làm sạch\". Điểm nổi bật: \"Công nghệ kết hợp chiên không dầu và hấp siêu nhiệt, dung tích lớn quay gà nguyên con, màn hình cảm ứng 12 chế độ, lòng nồi chống dính ceramic\". Ưu đãi: \"Tặng bộ phụ kiện 5 món và sách công thức độc quyền\". Thiết kế phong cách nhà bếp ấm cúng, cao cấp. Background là căn bếp hiện đại, hiển thị review 5 sao. Hình ảnh một con gà quay vàng ươm, khói bốc lên nghi ngút bên trong lồng kính của chiếc nồi chiên hiện đại. Tone màu đen bóng của thiết bị và màu vàng cam của thức ăn, typography ấm áp, food photography style, ultra realistic."
+  }
+ },
+ {
+  "id": "p10",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "wedding",
+   "stars",
+   "script_font"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 4010,
+   "prompt": "Tạo ảnh quảng cáo cho dịch vụ studio cưới cao cấp. Tiêu đề: \"Lưu giữ khoảnh khắc thanh xuân rực rỡ nhất\". Tên dịch vụ: \"Gói Chụp Ảnh Cưới Cinematic Love\". Mô tả ngắn: \"Cô dâu chú rể vỡ òa hạnh phúc khi nhận album cưới mang đậm chất điện ảnh, tự nhiên và ngập tràn cảm xúc\". Điểm nổi bật: \"Bao gồm 3 váy cưới thiết kế cao cấp, makeup artist chuyên nghiệp đi kèm, concept cá nhân hóa theo câu chuyện tình yêu, không phát sinh chi phí\". Ưu đãi: \"Tặng ngay 1 ảnh cổng tráng gương pha lê và clip hậu trường trị giá 3 triệu\". Thiết kế phong cách lãng mạn, thanh lịch, luxury wedding. Background là khung cảnh bình minh trên bãi biển hoặc kiến trúc cổ điển. Hiển thị đánh giá 5 sao. Hình ảnh cô dâu chú rể đang trao nhau nụ hôn say đắm dưới ánh sáng ngược (backlight) tuyệt đẹp. Tone màu trắng, be và ánh sáng vàng ấm (golden hour), typography font chữ ký bay bổng mềm mại, cinematic lighting."
+  }
+ },
+ {
+  "id": "p11",
+  "tags": [
+   "prompt_test",
+   "prompt_only",
+   "long_dense",
+   "category_mismatch",
+   "mattress",
+   "stars",
+   "cross_section"
+  ],
+  "why": "prompt thật (prompt_test.txt): feedback dài, nhiều câu khách, review 5 sao, loại để mặc định promo",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "9:16",
+   "num_images": 1,
+   "seed": 4011,
+   "prompt": "Tạo ảnh feedback khách hàng cho sản phẩm chăm sóc giấc ngủ. Tiêu đề: \"Tạm biệt đau lưng, ngủ sâu giấc đến sáng\". Tên sản phẩm: \"Nệm Lò Xo Túi Độc Lập CloudSleep\". Mô tả ngắn: \"99% khách hàng phản hồi không còn tình trạng đau mỏi vai gáy, nệm nâng đỡ cơ thể hoàn hảo và không làm ảnh hưởng người nằm cạnh\". Điểm nổi bật: \"Hệ thống lò xo túi độc lập 5 vùng, lớp bề mặt cao su thiên nhiên 100%, áo nệm tản nhiệt mát lạnh, bảo hành xẹp lún 15 năm\". Ưu đãi: \"Trải nghiệm miễn phí 100 đêm, tặng kèm 2 gối lông vũ cao su non\". Thiết kế phong cách thư giãn, tĩnh lặng, phòng ngủ chuẩn khách sạn 5 sao. Hiển thị review 5 sao. Hình ảnh 3D góc cắt lớp (cross-section) của nệm hiển thị lò xo và một người phụ nữ đang cuộn mình ngủ cực kỳ ngon giấc trên chiếc giường trắng tinh khôi. Tone màu xanh dương sẫm (midnight blue) mang lại cảm giác dễ ngủ, typography êm ái, ánh sáng mờ ảo nhẹ nhàng từ đèn ngủ, photorealistic."
+  }
+ },
+ {
+  "id": "f01",
+  "tags": [
+   "form_vague",
+   "promo",
+   "full"
+  ],
+  "why": "form khuyến mãi đủ + 'làm poster đẹp'",
+  "request": {
+   "category": "promo",
+   "title": "BLACK FRIDAY",
+   "discount": "Giảm đến 60%",
+   "applied_product": "Toàn bộ giày thể thao",
+   "date_start": "27/11",
+   "date_end": "30/11/2026",
+   "store_name": "Sneaker Hub",
+   "phone": "0909 456 123",
+   "prompt": "làm poster đẹp",
+   "aspect_ratio": "4:5",
+   "num_images": 2,
+   "seed": 5001
+  }
+ },
+ {
+  "id": "f02",
+  "tags": [
+   "form_vague",
+   "product_intro",
+   "product_image"
+  ],
+  "image": "bench/refs/dove_shampoo.jpg",
+  "why": "form sản phẩm + ảnh + 'thiết kế giúp mình'",
+  "request": {
+   "category": "product_intro",
+   "product_name": "Dầu gội Dove phục hồi",
+   "product_desc": "Tóc mềm mượt sau lần gội đầu tiên",
+   "highlights": "Không paraben, Hương dịu nhẹ",
+   "price": "135.000đ",
+   "prompt": "thiết kế giúp mình",
+   "aspect_ratio": "1:1",
+   "num_images": 2,
+   "seed": 5002
+  }
+ },
+ {
+  "id": "f03",
+  "tags": [
+   "form_vague",
+   "opening",
+   "no_diacritics"
+  ],
+  "why": "form khai trương + prompt gõ không dấu",
+  "request": {
+   "category": "opening",
+   "title": "KHAI TRƯƠNG",
+   "opening_date": "Thứ Sáu, 05/12/2026",
+   "opening_promo": "Giảm 30% toàn menu 3 ngày đầu",
+   "store_name": "Phở Gánh Hà Nội",
+   "address": "56 Lý Tự Trọng, Quận 1",
+   "prompt": "tao poster khai truong cho quan minh",
+   "aspect_ratio": "9:16",
+   "num_images": 1,
+   "seed": 5003
+  }
+ },
+ {
+  "id": "f04",
+  "tags": [
+   "form_vague",
+   "feedback"
+  ],
+  "why": "form feedback đủ + 'như mẫu trên facebook'",
+  "request": {
+   "category": "feedback",
+   "title": "KHÁCH HÀNG NÓI GÌ?",
+   "feedback_target": "Dịch vụ giặt sấy lấy ngay",
+   "feedback_quote": "Giao nhận tận nơi đúng giờ, quần áo thơm và gấp rất gọn gàng!",
+   "customer_name": "Chị Thu Hà, quận 7",
+   "special_offer": "Giảm 15% đơn đầu tiên",
+   "store_name": "Giặt Là 247",
+   "prompt": "làm giống mẫu quảng cáo trên facebook",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 5004
+  }
+ },
+ {
+  "id": "f05",
+  "tags": [
+   "form_vague",
+   "recruitment",
+   "category_ok"
+  ],
+  "why": "form tuyển dụng đủ + 'tạo poster tuyển dụng'",
+  "request": {
+   "category": "recruitment",
+   "title": "TUYỂN GẤP",
+   "job_position": "Nhân viên bán hàng (5 người)",
+   "job_desc": "Lương 7-10 triệu, thưởng doanh số, làm ca linh hoạt",
+   "apply_deadline": "20/12/2026",
+   "apply_method": "Nhắn Zalo 0977 222 333",
+   "store_name": "Siêu thị mini An Phát",
+   "prompt": "tạo poster tuyển dụng",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 5005
+  }
+ },
+ {
+  "id": "f06",
+  "tags": [
+   "form_vague",
+   "guide"
+  ],
+  "why": "form hướng dẫn 4 bước + 'đẹp nhé'",
+  "request": {
+   "category": "guide",
+   "title": "ĐẶT HÀNG ONLINE 4 BƯỚC",
+   "guide_steps": [
+    "Chọn sản phẩm",
+    "Thêm vào giỏ",
+    "Điền địa chỉ",
+    "Thanh toán khi nhận hàng"
+   ],
+   "store_name": "Bếp Nhà Lan",
+   "website_link": "bepnhalan.vn",
+   "prompt": "đẹp nhé",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 5006
+  }
+ },
+ {
+  "id": "f07",
+  "tags": [
+   "form_vague",
+   "promo_default_but_opening"
+  ],
+  "why": "nội dung khai trương nhưng để loại mặc định promo + 'banner'",
+  "request": {
+   "category": "promo",
+   "title": "KHAI TRƯƠNG CHI NHÁNH MỚI",
+   "discount": "Tặng 1 ly khi mua 2",
+   "store_name": "Cà Phê Muối Chú Long",
+   "address": "88 Nguyễn Trãi, Huế",
+   "prompt": "banner",
+   "aspect_ratio": "16:9",
+   "num_images": 1,
+   "seed": 5007
+  }
+ },
+ {
+  "id": "f08",
+  "tags": [
+   "form_vague",
+   "product_intro",
+   "product_image",
+   "can"
+  ],
+  "image": "bench/refs/coca_cola_can.jpg",
+  "why": "ảnh lon + form + 'sang xịn'",
+  "request": {
+   "category": "product_intro",
+   "product_name": "Nước ngọt có ga vị nguyên bản",
+   "price": "10.000đ / lon",
+   "highlights": "Mát lạnh, Sảng khoái",
+   "store_name": "Tạp hoá Minh Tâm",
+   "prompt": "sang xịn mịn",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 5008
+  }
+ },
+ {
+  "id": "f09",
+  "tags": [
+   "form_vague",
+   "promo",
+   "emoji"
+  ],
+  "why": "form + prompt sơ sài có emoji",
+  "request": {
+   "category": "promo",
+   "title": "FLASH SALE 12.12",
+   "discount": "Đồng giá 99K",
+   "applied_product": "Áo thun basic",
+   "date_end": "12/12/2026",
+   "store_name": "Basic Wear",
+   "prompt": "làm poster sale 🔥🔥",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 5009
+  }
+ },
+ {
+  "id": "f10",
+  "tags": [
+   "form_vague",
+   "feedback",
+   "minimal"
+  ],
+  "why": "form feedback ít trường + 'tạo ảnh'",
+  "request": {
+   "category": "feedback",
+   "feedback_target": "Bánh mì que Pate Cô Ba",
+   "feedback_quote": "Giòn rụm, pate béo thơm, ăn hoài không ngán!",
+   "prompt": "tạo ảnh",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 5010
+  }
+ },
+ {
+  "id": "i01",
+  "tags": [
+   "plain_image"
+  ],
+  "why": "ảnh thường không chữ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "1:1",
+   "num_images": 1,
+   "seed": 6001,
+   "prompt": "vẽ chú chó corgi đội mũ noel ngồi trên tuyết"
+  }
+ },
+ {
+  "id": "i02",
+  "tags": [
+   "plain_image",
+   "16:9"
+  ],
+  "why": "hình nền ngang không chữ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "16:9",
+   "num_images": 1,
+   "seed": 6002,
+   "prompt": "ảnh phong cảnh vịnh Hạ Long lúc hoàng hôn, phong cách điện ảnh"
+  }
+ },
+ {
+  "id": "i03",
+  "tags": [
+   "poster_without_words"
+  ],
+  "why": "muốn poster nhưng không cho chữ -> không bịa chữ",
+  "request": {
+   "category": "promo",
+   "aspect_ratio": "4:5",
+   "num_images": 1,
+   "seed": 6003,
+   "prompt": "làm poster cho tiệm hoa của tôi"
+  }
+ }
+]

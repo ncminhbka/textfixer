@@ -132,9 +132,20 @@ tách "GIẢM" | "50%") thành ô có `runs`. **Tắt mặc định** (`TEXTFIX_
 | 09/10 | dev2 d17 | trích dẫn dài: mỗi dòng một chữ mồ côi, chữ co nhỏ | [code] đoạn văn bỏ `<br>` theo nháp, tự ngắt | chữ to hơn, hết mồ côi | thử (dựng lại) |
 | — | dev2 | overflow: sửa bằng code 0/7 | — | — | theo dõi |
 
+## Tập dev 3 (bench/dev3.json, soạn 09/10)
+
+40 yêu cầu, 62 ảnh -- dữ liệu MỚI để kiểm các sửa trên dev2 có tổng quát không, và mốc cho đợt hình học chữ:
+
+| Nhóm | Ca | Ảnh | Kiểm gì |
+|---|---|---|---|
+| typography khó | g01-g16 | 32 | chữ cong trên / dưới, vòng con dấu, ruy băng cong, chéo, nhãn nghiêng, lượn sóng, so le, một dòng nhiều cỡ / nhiều font |
+| prompt thật dài | p01-p11 (prompt_test.txt) | 15 | feedback dày chữ (tiêu đề, mô tả, điểm nổi bật, ưu đãi), review 5 sao, before / after, ngoặc cong, loại để mặc định promo |
+| form đủ + prompt sơ sài | f01-f10 | 12 | "làm poster đẹp", "thiết kế giúp mình", không dấu, "banner", emoji; 6 loại form, ảnh sản phẩm, loại để sai |
+| ảnh thường | i01-i03 | 3 | không chữ -> chỉ FLUX; "poster cho tiệm hoa" không cho chữ -> không bịa chữ |
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:
-1. `%run scripts/dev_batch.py bench/dev3_geo.json` -- tập hình học chữ (baseline cho đợt chữ cong).
+1. `%run scripts/dev_batch.py bench/dev3.json` -- tập dev 3 (thay cho dev3_geo: dev3 đã gồm cả 16 ca hình học chữ).
 2. Để so trước / sau dev2 (prompt LLM / VLM mới, B2 hai lượt, cỡ / khung mới): xoá `output/dev/dev2_manifest.json` rồi
    `%run scripts/dev_batch.py` -- chạy lại cả 40 ca (seed cố định; d33-d40 là ca mới).
