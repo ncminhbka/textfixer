@@ -183,8 +183,11 @@ def main_stats(m: np.ndarray, lh: float | None = None) -> dict | None:
     r = int(base - 0.5 * h0)
     while r > 0 and occ[r - 1] >= PROFILE_DROP * body:
         r -= 1
-    return {"base": base, "top": top, "h": base - r if ALT_H else h0, "h_med": h0, "x0": float(xs.min()), "x1": float(xs.max() + 1),
-            "parts": len(main)}
+    # cao NÉT CAO (phân vị 90 cao các nét chính): chữ hoa / chữ số / nét lên b d h k l t cao ~0.72 em ở mọi font -- ước cỡ không
+    # phụ thuộc tỉ lệ chữ hoa trong dòng (mặt cắt mật độ đo ra cao chữ hoa khi dòng nhiều chữ số -> cỡ phồng 1.36: 09/10 dev2)
+    h_tall = float(np.percentile([st[i, cv2.CC_STAT_HEIGHT] for i in main], 90))
+    return {"base": base, "top": top, "h": base - r if ALT_H else h0, "h_med": h0, "h_tall": h_tall, "x0": float(xs.min()),
+            "x1": float(xs.max() + 1), "parts": len(main)}
 
 
 def _drop_lead_mark(g: dict, box, lh: float) -> bool:
@@ -217,7 +220,7 @@ def measure(img: np.ndarray, box, ocr_text: str | None = None, others=()) -> dic
     if s is None:
         return None
     dist = cv2.distanceTransform(m, cv2.DIST_L2, 3)
-    return {"base": oy + s["base"], "top": oy + s["top"], "h": s["h"], "x0": ox + s["x0"], "x1": ox + s["x1"],
+    return {"base": oy + s["base"], "top": oy + s["top"], "h": s["h"], "h_tall": s["h_tall"], "x0": ox + s["x0"], "x1": ox + s["x1"],
             "color": "#%02x%02x%02x" % tuple(int(v) for v in g["color"]), "bg_lab": [float(v) for v in g["bg"]],
             **stroke_stats(m, dist), "parts": s["parts"], "mask": (m, ox, oy), "erase_mask": (g["erase"], ox, oy),
             "effect": g["effect"], "lead_mark": mark}

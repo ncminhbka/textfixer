@@ -46,6 +46,9 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    - Never write aspect ratios, resolutions or sizes (e.g. 9:16, 4k, 1080p).
 2. texts -- the texts the poster must show. ONLY the user's own words: copy every text EXACTLY character for character from the form values or from the quoted strings / explicit texts of the prompt (same case, accents, punctuation). Never invent, translate, shorten or rewrite text. Every filled content field appears in full (store name, phone, address, website included). A comma-separated list of highlights / features the user wrote becomes one text per item ONLY if the user separated them; copy each item exactly.
    - role: one of """ + ", ".join(ROLES) + """ (old_price = an original price shown crossed out next to the new price).
+   - Prompt and form disagree (a different value for the same thing: discount 20% in the form, "GIẢM 30%" in the prompt; another
+     headline): the PROMPT wins -- use the prompt's text, leave that form value out of texts and prompt_en, and put the form field
+     name in "overridden".
 3. variants -- ALTERNATIVE DESIGN DIRECTIONS for the same poster, exactly as many as asked below (empty list when none are asked).
    Each: name (2-4 words, e.g. "big type centered", "split photo / text", "card layout", "dark premium") and its own complete
    prompt_en following every rule of 1. Same subject, same product, same texts (every text in double quotes, exactly the same),
@@ -54,8 +57,9 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    The directions must differ from prompt_en and from each other, and all must stay professional and suit the category.
 Answer only the JSON object."""
 
-SCHEMA = {"type": "object", "additionalProperties": False, "required": ["intent", "prompt_en", "texts", "variants"],
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["intent", "prompt_en", "texts", "variants", "overridden"],
           "properties": {"intent": {"type": "string", "enum": ["poster", "image"]},
+                         "overridden": {"type": "array", "items": {"type": "string"}},
                          "prompt_en": {"type": "string"},
                          "variants": {"type": "array", "items": {
                              "type": "object", "additionalProperties": False, "required": ["name", "prompt_en"],
@@ -110,11 +114,16 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
                                        if k != "category"]
     must = list(dict.fromkeys(QUOTED.findall(prompt or "") + CURLY.findall(prompt or "")))
     out, log, seen = [], {"dropped": [], "added": []}, set()
+    # PROMPT THẮNG (09/10, d23): trường form mà prompt ghi giá trị khác -> bỏ giá trị form khỏi câu khách, không thêm lại
+    over = {k for k in raw.get("overridden") or [] if k in form and k != "category"} if prompt else set()
+    gone_vals = {_norm(str(x)).casefold() for k in over for x in (form[k] if isinstance(form[k], list) else [form[k]])}
+    if over:
+        log["overridden"] = sorted(over)
     pe_raw = raw.get("prompt_en", "")
     pe_open = QUOTED.sub(" ", pe_raw).casefold()   # prompt_en ngoài các chuỗi trong ngoặc kép
     for t in raw.get("texts", []):
         text = _norm(t.get("text", ""))
-        if not text or text in seen:
+        if not text or text in seen or text.casefold() in gone_vals:
             continue
         # không nguyên văn từ người dùng -> bỏ (không bịa chữ); so không phân biệt hoa / thường (08/10: "Khai trương cửa hàng ..."
         # viết hoa chữ đầu, prompt khách viết thường -> bị bỏ oan, tiêu đề mất khỏi câu khách -> VLM chép chữ nháp "TRƯỞNG")
@@ -138,7 +147,7 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
     # TRƯỜNG FORM đã điền mà không có trong câu khách (LLM viết lại thành câu khác -- "Apply deadline: 15/12/2026" -- nên bị bỏ ở
     # bước nguyên văn, 09/10 dev2 d32 mất hạn nộp) -> thêm nguyên giá trị trường
     for k, v in form.items():
-        if k == "category":
+        if k == "category" or k in over:
             continue
         for x in (v if isinstance(v, list) else [v]):
             xn = _norm(str(x))

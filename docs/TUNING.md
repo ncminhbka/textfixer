@@ -2,7 +2,7 @@
 
 Mỗi lượt tune ghi một dòng: ngày, tập dữ liệu, lỗi thấy, thay đổi, số đo trước -> sau, trạng thái.
 Trạng thái: **đo** (có số đo trên tập) · **thử** (chỉ thử vài ca / dựng lại) · **chờ server** (chưa chạy thật) · **đề xuất** (chưa làm).
-Tập: `dev2` = bench/dev2.json (chạy server 09/10, 51/62 ảnh tải về được) · `gt` = bench/slots_gt (23 ảnh, đáp án ô).
+Tập: `dev2` = bench/dev2.json (chạy server 09/10, đủ 62 ảnh) · `gt` = bench/slots_gt (23 ảnh, đáp án ô).
 
 ## Các bước
 
@@ -33,13 +33,13 @@ câu khách thiếu: VLM khai 9 ảnh, đo bằng mã thêm 5 ảnh.
 | 09/10 | dev2 d06 | phong cách "Y2K", "vintage" trong ngoặc kép thành chữ khách -> thiếu câu | chuỗi LLM dùng làm từ tả (không ngoặc) trong prompt_en -> không thêm | 2 câu thừa -> 0 | thử (LLM giả) |
 | 09/10 | dev2 d32 | LLM viết "Apply deadline: 15/12/2026" -> bị bỏ, mất hạn nộp | thêm lại giá trị trường form không có trong câu khách | mất 1 trường -> 0 | thử (LLM giả) |
 | 09/10 | dev2 d01 | ngoặc kép cong “…” không được bắt lại khi LLM sót | nhận cả ngoặc cong | — | thử |
-| — | dev2 d23 | form "Giảm 20%" và prompt "GIẢM 30%" mâu thuẫn: cả hai thành câu khách, poster không vẽ câu prompt | **cần quyết:** prompt thắng / form thắng / báo người dùng | — | đề xuất |
+| 09/10 | dev2 d23 | form "Giảm 20%" và prompt "GIẢM 30%" mâu thuẫn: cả hai thành câu khách, poster không vẽ câu prompt | **prompt thắng** (quyết 09/10): LLM ghi trường form bị thay vào `overridden`, code bỏ giá trị đó, không thêm lại | 2 câu form thừa -> 0 | thử (LLM giả) · chờ server |
 
 ### B1 Nháp
 
 | Ngày | Tập | Lỗi thấy | Thay đổi | Trước -> sau | Trạng thái |
 |---|---|---|---|---|---|
-| — | dev2 d19, d20 | hướng dẫn 5 / 8 bước: nháp vẽ 4 / 6-7 hàng -> mất bước, số bước nhảy (1 2 4 5) | vẽ lại nháp (seed khác) khi số hàng OCR < số mục danh sách | 3/4 ảnh hướng dẫn thiếu bước | đề xuất |
+| 09/10 | dev2 d19, d20 | hướng dẫn 5 / 8 bước: nháp vẽ 4 / 6-7 hàng -> mất bước, số bước nhảy (1 2 4 5) | **chấp nhận** (quyết 09/10): hạn chế của FLUX; câu thiếu đã được báo trên UI | — | chấp nhận |
 
 ### B2 Xoá
 
@@ -55,6 +55,9 @@ câu khách thiếu: VLM khai 9 ảnh, đo bằng mã thêm 5 ảnh.
 | 09/10 | dev2 d02 | nút chỉ có viền ("Shop now") không thành S | `_ring`: viền kín bao dòng, lòng không đổi | dev2: +2 vỏ đúng | đo (dev2) |
 | 09/10 | gt m03_s1 | vỏ nhạt bắt nhầm pill mà bản xoá còn giữ (chỉ nhạt màu, ΔE lòng ~10 như vỏ thật) | bỏ vỏ khi bản xoá còn mép vỏ (`SOFT_EDGE`: độ sắc mép bản xoá / nháp >= 0.6; vỏ thật 0.01-0.39, ca nhầm 1.05) | gt S F1 0.800 -> 0.842 (= trước lượt vỏ nhạt: không thêm sai) | đo (gt + dev2) |
 | — | dev2 d26, d12 | khung liên hệ tối trên nền tối, khung ngày nhiều dòng chưa thành S | dò vỏ quanh CỤM dòng | — | đề xuất |
+| 09/10 | dev2 (62) | too_small: chữ dựng ở cỡ nháp tràn ngang ngay từ đầu (VLM ghi cỡ = cỡ nháp, trung vị 0.99) vì **cỡ nháp đo phồng**: dòng chữ thường nhiều chữ số đo ra cao chữ hoa rồi chia cao chữ thường ("Hotline 0866 777 888" 1.37 lần) | dòng không toàn hoa, có >= 15% ký tự cao: cỡ = cao nét cao (phân vị 90) / 0.72 | bộ chữ biết cỡ (315 dòng, 7 font): p90 cỡ ước / thật 1.37 -> 1.18, trung vị 1.02 | đo |
+| 09/10 | dev2 (62) | too_small: khung dòng nắn theo lớp phủ co về một mẩu khi chữ nhỏ / nhạt ngoài vỏ ("25 Nguyễn Huệ, TP. Huế" 281 -> 30 px; 16 dòng) | khung nắn ngoài vỏ < 0.6 bề ngang OCR -> giữ bề ngang OCR (`SNAP_MIN_W`) | gt L F1 0.967 -> 0.976 | đo |
+| 09/10 | dev2 (62) | (hai dòng trên gộp) | replay: lệnh VLM cũ, cỡ px nhân theo cỡ mới / cũ | too_small 50 -> 39, ảnh có lỗi 35 -> 28 | đo (replay) |
 
 ### B3 Designer
 

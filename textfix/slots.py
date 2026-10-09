@@ -19,9 +19,11 @@ import re
 
 import numpy as np
 
-CAP_EM = 0.72        # cao chữ hoa / em
+CAP_EM = 0.72        # cao chữ hoa / em (cũng ~ cao chữ số, nét lên b d h k l t)
+TALL_MIN = 0.15      # dòng có >= 15% ký tự cao -> ước cỡ theo cao nét cao (glyph h_tall)
 X_EM = 0.53          # cao chữ thường (x-height) / em
 SNAP_SIDE = 0.35     # nắn khung dòng: xét lớp phủ quanh đa giác OCR, nới ngang / xuống 0.35 cao dòng ...
+SNAP_MIN_W = 0.6    # khung nắn (ngoài vỏ) hẹp hơn 0.6 bề ngang OCR = lớp phủ bắt thiếu nét -> giữ bề ngang OCR
 SNAP_UP = 0.9        # ... và lên 0.9 cao dòng (dấu thanh / mũ tiếng Việt)
 INK_IN_SHELL = 25.0  # trong vỏ: nét chữ = khác màu lòng vỏ >= 25 ΔE (cả lòng vỏ đều thuộc lớp phủ)
 GAP_SPLIT = 1.0      # trong một dòng OCR, khoảng KHÔNG nét rộng >= 1 cao dòng = hai mục riêng (khoảng cách từ ~0.3 cao dòng;
@@ -59,6 +61,11 @@ def _cov(a, b) -> float:
 
 
 # ---------------------------------------------------------------------------------------------------- đo
+def _tall(c: str) -> bool:
+    import unicodedata
+    return c.isupper() or c.isdigit() or unicodedata.normalize("NFD", c)[0] in "bdfhklt"
+
+
 def lines(img: np.ndarray) -> list[dict]:
     """Dòng OCR + số đo nét: cao thân chữ -> cỡ chữ (px), màu, góc nghiêng."""
     import cv2
@@ -83,8 +90,13 @@ def lines(img: np.ndarray) -> list[dict]:
         lt = [c for c in l["text"] if c.isalnum()]
         caps = bool(lt) and sum(c.isupper() or c.isdigit() for c in lt) >= 0.8 * len(lt)
         h = m["h"] if m else 0.7 * (l["box"][3] - l["box"][1])
+        size = h / (CAP_EM if caps else X_EM)
+        # dòng có ký tự CAO (chữ hoa / số / nét lên): cỡ theo cao nét cao nhất -- mặt cắt mật độ đo lẫn cao chữ hoa với cao chữ
+        # thường khi dòng nhiều chữ số ("Hotline 0866 777 888" ước 1.37 lần cỡ thật -> chữ dựng tràn ngang, co < 0.7: too_small)
+        if not caps and m and m.get("h_tall") and sum(_tall(c) for c in lt) >= TALL_MIN * max(1, len(lt)):
+            size = m["h_tall"] / CAP_EM
         L.append({"id": f"L{i}", "box": [float(v) for v in l["box"]], "poly": l["poly"], "ocr": l["text"],
-                  "size": float(h / (CAP_EM if caps else X_EM)), "color": m["color"] if m else None, "angle": ang,
+                  "size": float(size), "color": m["color"] if m else None, "angle": ang,
                   "caps": caps, "stroke": round(float(m["stroke"]), 1) if m else None,
                   "stroke_contrast": round(float(m["contrast"]), 2) if m else None,
                   "effect": {k: v for k, v in (m.get("effect") or {}).items() if k in ("dx", "dy", "color")} if m and m.get("effect") else None})
@@ -276,7 +288,13 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
             if i != j:
                 others |= pm
         l["ocr_box"] = list(l["box"])
-        l["box"] = _snap(l, ink, others)
+        b = _snap(l, ink, others)
+        o = l["ocr_box"]
+        # chữ nhỏ / nhạt ngoài vỏ: lớp phủ chỉ bắt vài mảnh nét -> khung co về một mẩu ("25 Nguyễn Huệ, TP. Huế" 281 -> 30 px,
+        # 09/10 dev2: 16 dòng) -> chữ dựng ở cỡ nháp tràn ngang, co còn 0.25-0.5 (too_small). Bề ngang OCR đáng tin hơn.
+        if not sh and b[2] - b[0] < SNAP_MIN_W * (o[2] - o[0]):
+            b = [o[0], b[1] if b[3] - b[1] >= 0.6 * (o[3] - o[1]) else o[1], o[2], b[3] if b[3] - b[1] >= 0.6 * (o[3] - o[1]) else o[3]]
+        l["box"] = b
     _unstack(L)
     S =[{k: v for k, v in s.items() if not k.startswith("_")} for s in O["S"]]
     for s in S:
