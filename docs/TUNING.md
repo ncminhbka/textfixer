@@ -59,6 +59,22 @@ câu khách thiếu: VLM khai 9 ảnh, đo bằng mã thêm 5 ảnh.
 | 09/10 | dev2 (62) | too_small: khung dòng nắn theo lớp phủ co về một mẩu khi chữ nhỏ / nhạt ngoài vỏ ("25 Nguyễn Huệ, TP. Huế" 281 -> 30 px; 16 dòng) | khung nắn ngoài vỏ < 0.6 bề ngang OCR -> giữ bề ngang OCR (`SNAP_MIN_W`) | gt L F1 0.967 -> 0.976 | đo |
 | 09/10 | dev2 (62) | (hai dòng trên gộp) | replay: lệnh VLM cũ, cỡ px nhân theo cỡ mới / cũ | too_small 50 -> 39, ảnh có lỗi 35 -> 28 | đo (replay) |
 
+#### Đợt HÌNH HỌC CHỮ (mở 09/10): chữ cong / lượn sóng / to dần / một dòng nhiều cỡ
+
+Mô hình chung: mỗi dòng = **đường chân** (chuỗi điểm, trái -> phải) + **hồ sơ cỡ**. OCR vẫn lo đọc chữ, khung, góc dòng thẳng /
+nghiêng; `textfix/geo.py` dò hình dạng từ NÉT (chuỗi mảnh nét cạnh nhau cùng cỡ -> điểm theo lát -> khớp đường tròn / đa thức /
+đường thẳng + cỡ đổi đều) và gộp các mẩu OCR / chi tiết I trên cùng đường chân thành một ô. Gộp mẩu cùng đường chân khác cỡ
+(OCR tách "GIẢM" | "50%") thành ô có `runs`. Đo: `python scripts/geo_synth.py make --n 90 && python scripts/geo_synth.py eval`
+(nền = bản xoá thật dev2, chữ vẽ bằng Chromium, đáp án tuyệt đối). **Tắt mặc định** (`TEXTFIX_GEO=on`) tới khi B3 + B4 xong.
+
+| Ngày | Tập | Lỗi thấy | Thay đổi | Trước -> sau | Trạng thái |
+|---|---|---|---|---|---|
+| 09/10 | synth 60 | OCR cắt cung thành mẩu thẳng / bỏ hai đầu cung; tách dòng nhiều cỡ | `geo.arcs` (cung tròn) + `geo.runs` | cung: nhận 0% -> 59%, đúng 1 ô 30% -> 76%; nhiều cỡ: đúng 1 ô 5% -> 73% | đo (synth) |
+| 09/10 | synth 90 | thêm lượn sóng, to dần | mô hình đường chân chung (cung / đa thức bậc 3 / thẳng + hồ sơ cỡ) | cung: có đường chân 60%, lệch 0.05 cỡ · sóng: 42%, lệch 0.08 (đa số coi là cung) · to dần: 25%, chiều đúng 100% · chéo: 100% đúng 1 ô, sai góc 0.5° · nhiều cỡ: 67% | đo (synth) |
+| 09/10 | gt, dev2 | không được làm hỏng dữ liệu thật | — | gt L / S / I không đổi; dev2: nhận đúng cung d10 v0 (gộp L1 + 2 mẩu I đầu cung), 1 nhận nhầm nhiều cỡ (chữ trang trí 10-16 px -> chặn cỡ >= 24 px) | đo |
+| — | — | dựng chữ theo đường chân (SVG textPath, cỡ từng ký tự), mô tả cho VLM | B4 + B3 | — | đang làm |
+| — | dev3_geo | kiểm trên nháp FLUX thật | chạy server `bench/dev3_geo.json` | — | chờ server |
+
 ### B3 Designer
 
 | Ngày | Tập | Lỗi thấy | Thay đổi | Trước -> sau | Trạng thái |

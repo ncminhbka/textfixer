@@ -96,6 +96,7 @@ def lines(img: np.ndarray) -> list[dict]:
         if not caps and m and m.get("h_tall") and sum(_tall(c) for c in lt) >= TALL_MIN * max(1, len(lt)):
             size = m["h_tall"] / CAP_EM
         L.append({"id": f"L{i}", "box": [float(v) for v in l["box"]], "poly": l["poly"], "ocr": l["text"],
+                  "base": float(m["base"]) if m and abs(ang) < 2 else None,
                   "size": float(size), "color": m["color"] if m else None, "angle": ang,
                   "caps": caps, "stroke": round(float(m["stroke"]), 1) if m else None,
                   "stroke_contrast": round(float(m["contrast"]), 2) if m else None,
@@ -309,6 +310,21 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
         I = [c for c in I if max(c["box"][2] - c["box"][0], c["box"][3] - c["box"][1]) >= DETAIL_MIN * lh]
     for k, c in enumerate(I, 1):
         c["id"] = f"I{k}"
+    # HÌNH HỌC CHỮ (geo.py): chữ chạy theo cung (OCR cắt mẩu / bỏ hai đầu cung) -> một ô L cung; một dòng nhiều cỡ OCR tách mẩu
+    # -> một ô L có runs. Nét chữ dò cung: lớp phủ ngoài vỏ + trong vỏ điểm khác màu lòng vỏ.
+    from . import geo
+    glog, glog2 = [], []
+    if geo.ENABLED:   # TẮT mặc định tới khi dựng (B4) + mô tả cho VLM (B3) xong: ô cung gộp mà dựng thẳng còn tệ hơn mẩu OCR
+        from .overlay import DIFF
+        Bp = _lab(plate)
+        ink = cv2.GaussianBlur(np.linalg.norm(A - Bp, axis=2), (0, 0), 1.0) > DIFF   # lớp phủ thô (mở 5 px làm vỡ nét mảnh)
+        for sh in O["S"]:
+            ink[sh["_mask"]] = (np.linalg.norm(A - sh["_fill_lab"], axis=2) > INK_IN_SHELL)[sh["_mask"]]
+        L, I, glog = geo.apply_arcs(L, I, geo.arcs(ink, W, H), CAP_EM)
+        L, glog2 = geo.runs(L)
+    for s in S:   # dòng trong vỏ: tính lại theo tâm ô (ô đã gộp)
+        x0, y0, x1, y1 = s["box"]
+        s["lines"] = [l["id"] for l in L if x0 <= (l["box"][0] + l["box"][2]) / 2 <= x1 and y0 <= (l["box"][1] + l["box"][3]) / 2 <= y1]
     for s in S:
         s["icons"] = [c["id"] for c in I if c["shell"] == s["id"]]
     for c in I:   # quan hệ với dòng gần nhất (gợi ý cho VLM: avatar cạnh tên, sao dưới tên, icon đầu dòng)
@@ -324,12 +340,13 @@ def build(draft: np.ndarray, plate: np.ndarray) -> dict:
                 best = (d, l["id"], side)
         c["near"] = f"{best[2]} {best[1]}" if best and best[0] <= 3 * max(8.0, c["box"][3] - c["box"][1]) else None
     # mask: lớp phủ (nháp - bản xoá đã dọn), cho "keep" dán lại trọn mảng bị xoá (không ghi JSON)
-    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"]}
+    return {"L": L, "S": S, "I": I, "size": [W, H], "by": {m["id"]: m for m in L + S + I}, "mask": O["mask"], "geo_log": glog + glog2}
 
 
 def public(M: dict) -> dict:
     """Ô để ghi JSON."""
-    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell") if k in m} for m in M["L"]],
+    return {"L": [{k: m[k] for k in ("id", "box", "ocr_box", "ocr", "size", "color", "angle", "shell", "curve", "runs", "geo", "path", "scale") if k in m}
+                  for m in M["L"]],
             "S": M["S"], "I": M["I"]}
 
 
