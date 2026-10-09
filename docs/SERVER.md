@@ -114,6 +114,8 @@ Lần đầu trình duyệt có thể hỏi "cho phép tải nhiều tệp": ch�
 %run scripts/dev_batch.py                      # tập dev bench/dev2.json (40 yêu cầu như người dùng điền UI, 73 ảnh) qua máy chủ
                                                # -> dev2_<giờ>_NN.zip ĐẦY ĐỦ (nháp, bản xoá, lượt đầu, poster, plan); đứt giữa
                                                # chừng: chạy lại lệnh này = chờ tiếp job cũ, không gửi lại
+%run scripts/dev_batch.py bench/dev3_geo.json  # tập HÌNH HỌC CHỮ (16 yêu cầu, 32 ảnh): chữ cong / vòng con dấu / chéo / nghiêng /
+                                               # lượn sóng / một dòng nhiều cỡ -> dev3_geo_<giờ>_NN.zip
 %run scripts/runs_report.py --last 5           # các lượt người dùng chạy trên giao diện (mặc định đầy đủ; --light chỉ poster)
 ```
 
