@@ -21,6 +21,9 @@ QUOTED = re.compile(r'"([^"]+)"')
 SYSTEM = """You are the copy planner and prompt engineer of a Vietnamese poster generator built on FLUX.2 by Black Forest Labs.
 Input: the user's poster form (category + filled fields, JSON) and/or a free prompt. Output ONE JSON object with:
 
+0. intent -- "poster" when the user wants words on the image: any quoted string, any filled form field, or a poster / banner / flyer / ad / menu / sign whose content (name, offer, price, date, slogan, ...) the user gave. "image" when the user only wants a picture (photo, illustration, artwork, wallpaper, ...) and gives no words to show. Never "image" when there is any user text to show.
+   For "image": texts = [], and prompt_en (and every variant) is a plain FLUX.2 image prompt following the same upsampling guidelines (subject, details, materials, lighting, mood, composition) WITHOUT poster layout and without adding any text; the rules about texts below do not apply.
+
 1. prompt_en -- an English prompt for FLUX.2 that draws the WHOLE poster including its text. Follow the official FLUX.2 prompt-upsampling guidelines:
    - Strictly preserve the user's subject and intent. Convert the request into a detailed paragraph.
    - Add concrete visual specifics: subject, form, materials, textures, lighting (quality, direction, color), shadows, spatial relationships, environment, mood, and a clean professional poster layout (where the headline, price / offer, list and footer sit; flat graphic text, badges, pills or cards where suitable).
@@ -38,8 +41,9 @@ Input: the user's poster form (category + filled fields, JSON) and/or a free pro
    The directions must differ from prompt_en and from each other, and all must stay professional and suit the category.
 Answer only the JSON object."""
 
-SCHEMA = {"type": "object", "additionalProperties": False, "required": ["prompt_en", "texts", "variants"],
-          "properties": {"prompt_en": {"type": "string"},
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["intent", "prompt_en", "texts", "variants"],
+          "properties": {"intent": {"type": "string", "enum": ["poster", "image"]},
+                         "prompt_en": {"type": "string"},
                          "variants": {"type": "array", "items": {
                              "type": "object", "additionalProperties": False, "required": ["name", "prompt_en"],
                              "properties": {"name": {"type": "string"}, "prompt_en": {"type": "string"}}}},
@@ -61,7 +65,8 @@ def _norm(s: str) -> str:
 
 def make_brief(llm, prompt: str | None = None, form: dict | None = None, design: dict | None = None,
                product_image: bool = False, n_variants: int = 0) -> dict:
-    """llm = llm.json_call(..., schema=SCHEMA). -> {prompt_en, texts: [{text, role}], variants: [{name, prompt_en}], log}.
+    """llm = llm.json_call(..., schema=SCHEMA). -> {mode, prompt_en, texts: [{text, role}], variants: [{name, prompt_en}], log}.
+    mode: "poster" (có câu khách -> cả dây chuyền) | "image" (không chữ khách -> chỉ FLUX vẽ, trả nháp).
     n_variants: số hướng thiết kế KHÁC (người dùng chọn nhiều ảnh: ảnh 1 = prompt_en, ảnh 2.. = các hướng này; cùng chữ khách).
     Mỗi prompt (chính và từng hướng) qua cùng các bước giữ cam kết: bỏ tỉ lệ / độ phân giải, chữ khách thiếu ngoặc kép thì nối."""
     form = {k: v for k, v in (form or {}).items() if k not in TECH_KEYS and v not in (None, "", [], False)}
@@ -120,7 +125,17 @@ def make_brief(llm, prompt: str | None = None, form: dict | None = None, design:
             variants.append({"name": " ".join(str(v.get("name") or "").split())[:60], "prompt_en": vp})
             if vm:
                 log.setdefault("variant_quoted_added", []).append(vm)
-    return {"prompt_en": pe, "texts": out, "variants": variants, "log": log}
+    # ẢNH THƯỜNG (09/10): không có câu khách nào -> chỉ FLUX vẽ, bỏ xoá / ô / VLM / dựng (trước đây báo lỗi "không tìm ra chữ").
+    # Có câu khách thì luôn là poster dù LLM nói "image" (chữ khách phải lên ảnh). LLM nói "poster" mà không có câu khách: prompt
+    # có thể tả chỗ tiêu đề / nút -> FLUX vẽ chữ vô nghĩa, dặn thêm không chữ.
+    intent = raw.get("intent") if raw.get("intent") in ("poster", "image") else "poster"
+    mode = "poster" if out else "image"
+    log["intent"] = intent
+    if mode == "image" and intent == "poster":
+        tail = " No text, letters, words or logos anywhere in the image."
+        pe += tail
+        variants = [{**v, "prompt_en": v["prompt_en"] + tail} for v in variants]
+    return {"mode": mode, "prompt_en": pe, "texts": out, "variants": variants, "log": log}
 
 
 def _approved(q: str, texts: list[dict]) -> bool:

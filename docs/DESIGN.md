@@ -17,6 +17,11 @@ Một lời gọi LLM: form / prompt -> `prompt_en` theo hướng dẫn nâng pr
 + danh sách câu khách kèm vai trò. Code bỏ câu không có nguyên văn trong dữ liệu người dùng, thêm lại chuỗi trong ngoặc kép bị sót,
 nối câu chưa có trong ngoặc kép của `prompt_en`, bỏ tỉ lệ / độ phân giải khỏi prompt.
 
+LLM cũng phân loại `intent`: `poster` (có chữ cần in) hay `image` (chỉ muốn ảnh: "tạo ảnh con mèo"). Code quyết theo câu khách:
+có câu khách -> `mode: poster`, chạy cả dây chuyền; không có -> `mode: image`, **chỉ FLUX vẽ, trả nháp** (bỏ xoá / ô / VLM / dựng;
+không bịa chữ). LLM nói `poster` mà không có câu khách ("làm poster cho quán của tôi"): prompt thêm "no text", UI gợi ý ghi câu
+trong ngoặc kép.
+
 ### 2. Nháp và bản xoá (`flux.py`)
 
 Nháp: FLUX.2-klein distill (4 bước); ảnh sản phẩm người dùng tải lên làm ảnh tham chiếu (FLUX giữ sản phẩm và chữ in trên đó rất

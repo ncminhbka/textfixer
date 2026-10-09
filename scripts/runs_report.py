@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         print("không có lượt mới")
     done = [rd.name for rd in runs if _done(rd)]
     first, final, trig, kept, n = collections.Counter(), collections.Counter(), 0, 0, 0
-    cfix, ckept = 0, 0
+    cfix, ckept, plain = 0, 0, 0
     T = collections.defaultdict(list)
     files = []
     for rd in runs:
@@ -104,6 +104,9 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             P = json.loads(pf.read_text(encoding="utf-8"))
             n += 1
+            if P.get("mode") == "image":   # ảnh thường (không chữ khách): chỉ FLUX vẽ
+                plain += 1
+                print(f"{rd.name}/{vd.name}: ảnh thường (không chữ khách)")
             e1 = P.get("errors_first") or []
             sev = [e for e in e1 if e["type"] in SEVERE]
             for e in e1:
@@ -129,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
                     if a.jpg and f in JPG:
                         src, arc = _jpg(src, zdir / "_jpg" / rd.name / vd.name), arc[:-4] + ".jpg"
                     files.append((src, arc))
-    print(f"\n{n} ảnh, sửa bằng code {cfix} (giữ {ckept}), vòng duyệt VLM {trig} (giữ {kept})")
+    print(f"\n{n} ảnh ({plain} ảnh thường), sửa bằng code {cfix} (giữ {ckept}), vòng duyệt VLM {trig} (giữ {kept})")
     print("lỗi lượt đầu:", dict(first))
     print("lỗi cuối:", dict(final))
     print("thời gian trung vị:", {k: round(st.median(v), 1) for k, v in T.items()})

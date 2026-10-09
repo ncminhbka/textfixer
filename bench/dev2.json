@@ -138,5 +138,21 @@
  {"id": "d32", "tags": ["form_only", "recruitment", "minimal", "16:9"],
   "why": "tuyển dụng ít trường, banner ngang",
   "request": {"category": "recruitment", "job_position": "Lập trình viên Python", "apply_deadline": "15/12/2026",
-   "apply_method": "jobs@techviet.io", "store_name": "TechViet", "aspect_ratio": "16:9", "num_images": 2, "seed": 2032}}
+   "apply_method": "jobs@techviet.io", "store_name": "TechViet", "aspect_ratio": "16:9", "num_images": 2, "seed": 2032}},
+ {"id": "d33", "tags": ["prompt_only", "no_text", "plain_image"],
+  "why": "chỉ muốn ảnh, không chữ -> intent image: FLUX vẽ là xong (trước 09/10 báo lỗi 'không tìm ra chữ')",
+  "request": {"category": "promo", "aspect_ratio": "1:1", "num_images": 2, "seed": 2033,
+   "prompt": "tạo ảnh con mèo"}},
+ {"id": "d34", "tags": ["prompt_only", "no_text", "plain_image", "9:16"],
+  "why": "ảnh nền điện thoại, không chữ -> image",
+  "request": {"category": "promo", "aspect_ratio": "9:16", "num_images": 1, "seed": 2034,
+   "prompt": "vẽ hình nền điện thoại đồi chè Mộc Châu lúc bình minh, sương mù, phong cách tranh màu nước"}},
+ {"id": "d35", "tags": ["prompt_only", "text_in_scene"],
+  "why": "ảnh minh hoạ nhưng có chữ trong cảnh do khách đưa -> phải là poster (chữ khách lên ảnh)",
+  "request": {"category": "promo", "aspect_ratio": "4:5", "num_images": 1, "seed": 2035,
+   "prompt": "vẽ con mèo mướp cầm tấm biển gỗ ghi \"Chào buổi sáng\""}},
+ {"id": "d36", "tags": ["prompt_only", "no_text", "poster_without_words"],
+  "why": "muốn poster nhưng không cho chữ nào -> không bịa chữ: ảnh không chữ + UI gợi ý ghi câu trong ngoặc kép",
+  "request": {"category": "promo", "aspect_ratio": "4:5", "num_images": 1, "seed": 2036,
+   "prompt": "làm poster cho quán cà phê của tôi, phong cách vintage"}}
 ]

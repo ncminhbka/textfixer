@@ -367,8 +367,9 @@ function show() {
          : `<div class="stage"><img src="${P[view + "_url"]}"></div>`;
   } else if (P.status !== "error") h += `<div class="stage"><div class="empty">Ảnh ${picked + 1}: ${esc(P.stage || "đang chờ")}…</div></div>`;
   const t = P.timing || {};
-  h += `<div class="meta"><div><h3>Chữ của khách (đúng nguyên văn)</h3><table>${R.brief.texts.map(x =>
-        `<tr><td class="role">${esc(x.role)}</td><td>${esc(x.text)}</td></tr>`).join("")}</table>
+  h += `<div class="meta"><div>${R.mode === "image" ? `<h3>Ảnh thường</h3><p>Yêu cầu không có chữ cần in nên ảnh do FLUX vẽ trực tiếp.
+        Muốn làm poster có chữ, hãy ghi câu cần in trong ngoặc kép, vd. "GIẢM 50%".</p>` : `<h3>Chữ của khách (đúng nguyên văn)</h3><table>${R.brief.texts.map(x =>
+        `<tr><td class="role">${esc(x.role)}</td><td>${esc(x.text)}</td></tr>`).join("")}</table>`}
         ${P.missing && P.missing.length ? `<p class="err">Không vẽ: ${P.missing.map(esc).join(" · ")}</p>` : ""}
         ${P.errors ? `<p class="err">Lỗi còn lại: ${P.errors}</p>` : ""}
         ${Object.keys(t).length ? `<h3 style="margin-top:12px">Thời gian (giây)</h3><div class="timing">${Object.entries(t).map(([k, v]) =>

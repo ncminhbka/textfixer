@@ -5,6 +5,7 @@
       r = E.make(B, W, H, seed)                              # FLUX vẽ nháp -> fix()
       r = E.fix(draft, B, seed, plate=None)                  # xoá (FLUX) -> dọn chữ sót -> ô -> VLM điền ô -> dựng -> kiểm -> sửa
   r: {draft, plate_raw, plate, poster, poster_first, steps (ảnh 4 cột), plan (JSON: ô, lệnh, lỗi, nhật ký, câu thiếu), timing}
+  B["mode"] == "image" (không chữ khách): make() chỉ FLUX vẽ -> r = {draft, poster (= nháp), plan {mode}, timing}
 
 Hai trạm dùng riêng được (máy chủ chạy dây chuyền nhiều phiên bản song song, server/app.py):
   d = draw(flux, B, W, H, seed, product)          # GPU: nháp -> xoá -> dọn chữ sót
@@ -51,6 +52,9 @@ class Engine:
 
     def make(self, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = None) -> dict:
         d = draw(self.flux, B, W, H, seed, product, progress=self.progress)
+        if B.get("mode") == "image":
+            return {"draft": d["draft"], "poster": d["draft"], "plan": {"mode": "image"},
+                    "timing": {k: round(v, 1) for k, v in d["timing"].items()}}
         return design(d, B, self.vlm, self.browser.page, product=product is not None, progress=self.progress)
 
     def fix(self, draft: np.ndarray, B: dict, seed: int = 0, plate: np.ndarray | None = None, product: bool = False) -> dict:
@@ -78,6 +82,8 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
         t0 = time.time()
         draft = flux.generate(B["prompt_en"], W, H, seed, refs=[product] if product is not None else None)
         T["ve_nhap"] = time.time() - t0
+    if B.get("mode") == "image":   # ảnh thường (không chữ khách): FLUX vẽ là xong
+        return {"draft": draft, "timing": T}
     t0 = time.time()
     if plate is None:
         progress("FLUX xoá lớp phủ")

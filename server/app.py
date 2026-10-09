@@ -296,6 +296,21 @@ def design_one(job: dict, v: dict, d: dict, Bv: dict, product: bool, vd: Path, u
         v.update(status="error", stage="", error=f"{type(e).__name__}: {e}")
 
 
+def image_one(job: dict, v: dict, d: dict, Bv: dict, vd: Path, url: str, t_llm: float) -> None:
+    """ẢNH THƯỜNG (B["mode"] == "image": không chữ khách): ảnh FLUX vẽ là kết quả, không xoá / ô / VLM / dựng."""
+    try:
+        save(d["draft"], vd / "poster.png")
+        timing = {"llm": t_llm, **{k: round(x, 1) for k, x in d["timing"].items()}}
+        (vd / "plan.json").write_text(json.dumps({"mode": "image", "seed": v["seed"], "direction": v.get("direction"),
+                                                  "prompt_en": Bv["prompt_en"], "timing": timing}, ensure_ascii=False, indent=1),
+                                      encoding="utf-8")
+        v.update(status="done", stage="", poster_url=f"{url}/poster.png", timing=timing, missing=[], errors=0, ops=0)
+        log.info("%s v%d xong (ảnh thường, gpu %s) %s", job["run_id"], v["index"], v.get("gpu"), timing)
+    except Exception as e:
+        log.error("%s v%d lỗi lưu ảnh: %s", job["run_id"], v["index"], traceback.format_exc())
+        v.update(status="error", stage="", error=f"{type(e).__name__}: {e}")
+
+
 def run_job(job: dict, req: GenerateRequest) -> dict:
     """Một yêu cầu: LLM một lần (brief + các hướng thiết kế), rồi n phiên bản vào dây chuyền VẼ -> THIẾT KẾ. Kết quả từng phiên
     bản ghi vào job["result"]["posters"] ngay khi xong (UI hiện dần)."""
@@ -319,13 +334,12 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
     B = make_brief(STATE["llm"], prompt, form if len(form) > 1 else None, design_hint, product is not None, n_variants=n - 1)
     t_llm = round(time.time() - t0, 1)
     (rd / "brief.json").write_text(json.dumps(B, ensure_ascii=False, indent=1), encoding="utf-8")
-    if not B["texts"]:
-        raise ValueError("LLM không tìm ra chữ nào để vẽ (form trống?)")
+    plain = B.get("mode") == "image"   # không chữ khách: chỉ FLUX vẽ
     W, H = SIZES.get(req.aspect_ratio, SIZES["1:1"])
     base_seed = req.seed if req.seed is not None else int(time.time()) % 100000
     directions = [{"name": "chính", "prompt_en": B["prompt_en"]}] + B.get("variants", [])
     posters = []
-    job["result"] = {"status": "running", "run_id": run_id, "width": W, "height": H, "posters": posters,
+    job["result"] = {"status": "running", "run_id": run_id, "mode": B.get("mode", "poster"), "width": W, "height": H, "posters": posters,
                      "brief": {"prompt_en": B["prompt_en"], "texts": B["texts"], "variants": B.get("variants", []), "log": B["log"]}}
     futs = []
     for i in range(n):
@@ -343,6 +357,9 @@ def run_job(job: dict, req: GenerateRequest) -> dict:
             if f.exception() is not None:
                 log.error("%s v%d lỗi vẽ: %s", run_id, i, f.exception())
                 v.update(status="error", stage="", error=f"{type(f.exception()).__name__}: {f.exception()}")
+                return
+            if plain:
+                futs.append(DESIGN.submit(image_one, job, v, f.result(), Bv, vd, f"outputs/{run_id}/v{i}", t_llm))
                 return
             v.update(status="designing", stage="chờ thiết kế")
             futs.append(DESIGN.submit(design_one, job, v, f.result(), Bv, product is not None, vd, f"outputs/{run_id}/v{i}", t_llm))
