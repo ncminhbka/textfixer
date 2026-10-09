@@ -21,6 +21,7 @@ TOL = 22.0         # điểm thuộc màu nét: cách tâm màu <= 22 ΔE
 HALO = 0.06        # nới mặt nạ nét 0.06 cao dòng (>= 2 px): viền khử răng cưa, bóng sát nét
 TEXTURE = 10.0     # nền quanh nét: lệch trung vị tới màu trung vị (ΔE) > 10 = nền có vân / ảnh -> FLUX xoá lại vùng cắt (inpaint
                    # nhoè thành mảng, m03 07/10); <= 10 = phẳng / chuyển màu đều (pill, thẻ, badge: <= 9 trên 36 cặp) -> inpaint
+CONFIRM = 0.5      # dòng bản xoá không khớp dòng nháp: OCR lại vùng trên nháp giống chữ >= 0.5 = chữ sót
 CROP_MIN = 384     # vùng cắt cho FLUX: cạnh >= 384 px ảnh gốc (đủ ngữ cảnh), phóng để cạnh dài 768
 
 
@@ -121,16 +122,48 @@ def _reerase(out: np.ndarray, full: np.ndarray, h: float, erase) -> None:
     out[y0:y1, x0:x1] = (er * a + crop * (1 - a)).round().clip(0, 255).astype(np.uint8)
 
 
-def clean(draft: np.ndarray, plate: np.ndarray, draft_lines: list[dict] | None = None, erase=None) -> tuple[np.ndarray, dict]:
-    """-> (bản xoá đã dọn, {"lines", "inpaint", "reerase", "px"}). erase(ảnh) -> ảnh: FLUX xoá (lời dặn A) cho vùng cắt nền
-    có vân; None (không có FLUX): mọi dòng inpaint."""
+def _confirm(draft: np.ndarray, l: dict) -> bool:
+    """Dòng bản xoá không khớp dòng OCR nào của nháp: OCR lại vùng đó trên NHÁP (cắt, phóng 2x) -- OCR nháp hay sót dòng chữ
+    nhỏ / nhiều chữ (09/10 dev2 d18: "Gửi CV: tuyendung@..." sót ở nháp nên chữ còn trên bản xoá không bị dọn)."""
     import cv2
+    from difflib import SequenceMatcher
+    from .ocr import read_lines
+    x0, y0, x1, y1 = l["box"]
+    h = y1 - y0
+    H, W = draft.shape[:2]
+    X0, Y0, X1, Y1 = int(max(0, x0 - h)), int(max(0, y0 - 0.6 * h)), int(min(W, x1 + h)), int(min(H, y1 + 0.6 * h))
+    crop = cv2.resize(np.ascontiguousarray(draft[Y0:Y1, X0:X1]), None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    f = lambda t: "".join(ch for ch in t.lower() if ch.isalnum())   # noqa: E731
+    return any(SequenceMatcher(None, f(d["text"]), f(l["text"])).ratio() >= CONFIRM for d in read_lines(crop))
+
+
+def clean(draft: np.ndarray, plate: np.ndarray, draft_lines: list[dict] | None = None, erase=None,
+          strict: bool = True) -> tuple[np.ndarray, dict]:
+    """-> (bản xoá đã dọn, {"lines", "inpaint", "reerase", "px", "round2"}). erase(ảnh) -> ảnh: FLUX xoá (lời dặn A) cho vùng
+    cắt nền có vân; None (không có FLUX): mọi dòng inpaint. strict (khách KHÔNG tải ảnh sản phẩm): dòng bản xoá không khớp dòng
+    nháp nào mà OCR lại vùng đó trên nháp thấy cùng chữ cũng là chữ sót (có ảnh sản phẩm: chữ in trên sản phẩm cũng vậy -- giữ)."""
     from .ocr import read_lines
     dl = draft_lines if draft_lines is not None else read_lines(draft)
-    left = leftovers(dl, read_lines(plate))
+    pl = read_lines(plate)
+    left = leftovers(dl, pl)
+    if strict:
+        extra = [l for l in pl if l not in left and l.get("score", 1) >= MIN_SCORE and _confirm(draft, l)]
+        left += extra
+        dl = dl + extra
     info = {"lines": [l["text"] for l in left], "inpaint": [], "reerase": [], "px": 0}
     if not left:
         return plate, info
+    out = _clean_once(plate, left, erase, info)
+    # LƯỢT 2: OCR lại bản đã dọn -- inpaint không sạch (nét đậm trên huy hiệu: "-36" còn, 09/10 dev2 d27) -> FLUX vùng cắt
+    left2 = leftovers(dl, read_lines(out))
+    if left2:
+        info["round2"] = [l["text"] for l in left2]
+        out = _clean_once(out, left2, erase, info, force_flux=True)
+    return out, info
+
+
+def _clean_once(plate: np.ndarray, left: list[dict], erase, info: dict, force_flux: bool = False) -> np.ndarray:
+    import cv2
     out = plate.copy()
     lab = _lab(plate)
     H, W = plate.shape[:2]
@@ -140,7 +173,7 @@ def clean(draft: np.ndarray, plate: np.ndarray, draft_lines: list[dict] | None =
         if not m.any():
             continue
         info["px"] += int(m.sum())
-        if erase is not None and _texture(lab, m, x0, y0, h) > TEXTURE:
+        if erase is not None and (force_flux or _texture(lab, m, x0, y0, h) > TEXTURE):
             full = np.zeros((H, W), bool)
             full[y0:y0 + m.shape[0], x0:x0 + m.shape[1]] = m
             rough.append((full, h, l["text"]))
@@ -168,4 +201,4 @@ def clean(draft: np.ndarray, plate: np.ndarray, draft_lines: list[dict] | None =
         except Exception as e:   # FLUX lỗi: inpaint
             out = cv2.inpaint(out, full.astype(np.uint8), max(3, int(0.12 * h)), cv2.INPAINT_TELEA)
             info["inpaint"].append(f"{texts} (FLUX lỗi: {type(e).__name__})")
-    return out, info
+    return out

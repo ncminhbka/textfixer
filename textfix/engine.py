@@ -94,7 +94,7 @@ def draw(flux, B: dict, W: int, H: int, seed: int, product: np.ndarray | None = 
     # bước xoá ngẫu nhiên: dọn chữ còn sót (OCR bản xoá) TRƯỚC khi tách ô -> chỗ dọn thành lớp phủ, thành ô như mọi chữ khác
     progress("dọn chữ sót")
     fe = (lambda im: flux.edit(im, ERASE_PROMPT, seed)) if flux is not None else None   # noqa: E731
-    plate, cinfo = cleanup.clean(draft, plate, erase=fe)
+    plate, cinfo = cleanup.clean(draft, plate, erase=fe, strict=product is None)
     T["don"] = time.time() - t0
     return {"draft": draft, "plate_raw": plate_raw, "plate": plate, "cinfo": cinfo, "timing": T}
 

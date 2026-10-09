@@ -411,6 +411,8 @@ or object in the photo (its original pixels are restored, never redraw such text
 - "keep" is only for things printed in the photographed scene. POSTER lettering is never kept, however decorated it is \
 (a headline on a ribbon or banner, curved, 3D or metallic letters, badge and sticker text): the draft's letters are often \
 misspelt, so it is always rewritten as a text op with the client's spelling.
+- A product's screen, display, dial, label or packaging text is part of the picture: "keep" it (or "skip"), never write \
+words or numbers there.
 - Every slot id appears in exactly ONE op -- never leave a slot out (use "skip" to drop it).
 
 TEXT
@@ -418,8 +420,8 @@ TEXT
 between the lines of a multi-line op). Write about as many characters per line as the model wrote there -- never much more: \
 crammed text gets shrunk and looks bad.
 - A client text longer than the lines the model gave it: shorten or rephrase it so it fits naturally; facts (names, prices, \
-numbers, dates, phones, addresses, emails, links) are never changed or invented -- keep them exact or leave them out; the \
-unit belongs to the number (15-25 triệu, 35.000đ, 30 phút, 50%): never drop it. Set \
+numbers, dates, phones, addresses, emails, links) are never changed, abbreviated or invented -- keep them exact (Quận 3 \
+stays "Quận 3", never "Q.3") or leave them out; the unit belongs to the number (15-25 triệu, 35.000đ, 30 phút, 50%): never drop it. Set \
 "client": "T<i>" on ops writing (part of) a client text; list client texts the model did not draw, or that you dropped, in \
 "missing".
 - SPELLING: copy client words character for character, with every Vietnamese diacritic. The draft's letters are often \
@@ -459,7 +461,8 @@ shows it. Never make body text compete with the headline.
 when the background is busy or mid-tone, add a subtle text-shadow or a shell, in the poster's palette.
 - Lost shells: if the DRAFT shows a button, pill, badge or band behind a line but the BASE does not (the eraser removed it and \
 no S# slot covers it), recreate it in that text op's box_style (background, border-radius, a little padding) in the draft's \
-colors -- a call-to-action must never end up as bare text.
+colors -- a call-to-action must never end up as bare text. Only then: a line inside an S# shell, or on a shell the BASE still shows, never gets its own background or border (no card inside a card).
+- Alignment: keep the draft's alignment per block -- a centered headline stays centered, a left column stays left.
 - Size: write every line at the size measured for its slot; fine print, labels and footers too -- never smaller "to be safe". \
 If a text does not fit, shorten it (facts stay exact) rather than shrinking it.
 - Lists: keep the draft's list structure -- one item per row, each row keeps its own text next to its bullet / check / icon; \
@@ -839,7 +842,10 @@ def _guard(ops: list[dict], M: dict, texts: list[dict]) -> tuple[list[dict], lis
             out.append({**op, "kind": "skip", "html": "", "why": "guard: invented text"})
             continue
         nums = re.findall(r"\d+", plain)
-        if own is None and nums and not all(any(n in t for t in txt) for n in nums):
+        # so NGUYÊN số (không phải chuỗi con: "00" nằm trong "1.590.000đ", "36" trong "-36%" -> "00:36" trên màn hình nồi cơm lọt
+        # qua, 09/10 dev2 d27)
+        tnums = {n for t in txt for n in re.findall(r"\d+", t)}
+        if own is None and nums and not all(n in tnums for n in nums):
             # SỐ BỊA: lệnh không khai câu khách mà viết số không có trong câu khách nào (địa chỉ / giá / điện thoại / ngày nháp tự
             # vẽ, 08/10 "123 Đường Số 1, Quận 1, TP. HCM") -> skip: dữ kiện không bao giờ bịa
             log.append(f"{op.get('id')}: số không có trong câu khách ({plain!r}) -> skip")
