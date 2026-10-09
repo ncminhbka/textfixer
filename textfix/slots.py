@@ -746,11 +746,31 @@ def plan(draft: np.ndarray, M: dict, prompt: str, texts: list[dict], call, produ
     return _to_marks(call(*args))
 
 
+CLIENT_LIKE = 0.6   # chữ OCR của ô giống câu khách >= 0.6 (bỏ dấu, chữ thường) = chữ poster chứa câu khách
 PRINTED = re.compile(r"\b(printed|on (the )?(product|package|packaging|label|can|bottle|jar|box|screen))\b", re.I)
 
 
-def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, list[str]]:
-    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh. texts (câu khách): chặn chữ (_guard)."""
+def _client_like(ocr: str, texts: list[dict]) -> int | None:
+    """Chữ OCR (méo) của ô gần trùng một câu khách (bỏ dấu, chữ thường, giống >= CLIENT_LIKE) -> chỉ số câu đó."""
+    from difflib import SequenceMatcher
+    f = _flat(ocr or "")
+    if len(f) < 4:
+        return None
+    best = max(((SequenceMatcher(None, f, _flat(t["text"])).ratio(), i) for i, t in enumerate(texts)), default=(0, None))
+    if best[0] >= CLIENT_LIKE:
+        return best[1]
+    # OCR chỉ đọc được MẨU của câu (chữ cong trên ruy băng: "TRIAN" của "QUÀ TẶNG TRI ÂN") -> mẩu nằm gọn trong câu
+    for i, t in enumerate(texts):
+        m = SequenceMatcher(None, f, _flat(t["text"]))
+        # khớp LIỀN một đoạn (ký tự rải rác trong câu dài 150 ký tự không tính: "Noinlien Hic" trên thân nồi, dev3 p09)
+        if len(f) >= 5 and m.find_longest_match(0, len(f), 0, len(_flat(t["text"]))).size >= 0.8 * len(f):
+            return i
+    return None
+
+
+def validate(P: dict, M: dict, texts: list[dict] | None = None, product: bool = False) -> tuple[dict, list[str]]:
+    """Phòng ngừa nhẹ, có ghi log: id ô không có -> bỏ id; lệnh không còn ô nào -> bỏ lệnh. texts (câu khách): chặn chữ (_guard).
+    product: khách tải ảnh sản phẩm (chữ in trên sản phẩm có thật)."""
     log, ops = [f"bỏ lệnh sai khuôn: {d}" for d in P.get("dropped") or []], []
     by = M["by"]
     for op in P.get("ops", []):
@@ -761,10 +781,31 @@ def validate(P: dict, M: dict, texts: list[dict] | None = None) -> tuple[dict, l
             continue
         # chữ / logo IN TRÊN SẢN PHẨM mà VLM cho skip (tự ghi lý do "printed logo on product") -> bản xoá đã xoá nó, skip là mất
         # luôn (09/10 dev2 d25: con dấu trên bánh pía) -> keep (dán lại pixel nháp)
-        if op.get("kind") == "skip" and PRINTED.search(op.get("why") or "") and not re.search(r"duplicat|junk|garbl", op.get("why") or "", re.I):
+        # CHỈ khi khách tải ảnh sản phẩm: không có ảnh sản phẩm thì "chữ in trên ruy băng / sản phẩm" là chữ POSTER FLUX vẽ (09/10
+        # dev3 g15: dải ruy băng "QUÀ TẶNG TRI ÂN" -> keep dán lại chữ nháp sai chính tả "QUẢ TỆNG")
+        if product and op.get("kind") == "skip" and PRINTED.search(op.get("why") or "") and                 not re.search(r"duplicat|junk|garbl", op.get("why") or "", re.I):
             log.append(f"{op.get('id')}: skip chữ in trên sản phẩm ({op.get('why')!r}) -> keep")
             op = {**op, "kind": "keep"}
+        # KEEP CHỮ KHÁCH: ô giữ pixel nháp mà chữ OCR của nó gần trùng một câu khách = chữ poster model vẽ (thường sai chính tả)
+        # -> viết lại bằng câu khách (09/10 dev3 g15 v0: VLM keep "QUÀ TẶNG TRI ÂN" trên ruy băng)
+        if op.get("kind") == "keep" and texts:
+            ocr = " ".join(by[m].get("ocr", "") for m in mk if m.startswith("L"))
+            k = _client_like(ocr, texts)
+            if k is not None:
+                log.append(f"{op.get('id')}: keep chữ nháp {ocr!r} trùng câu khách T{k} -> viết lại {texts[k]['text']!r}")
+                op = {**op, "kind": "text", "html": texts[k]["text"], "client": f"T{k}", "why": "guard: client text was kept"}
         ops.append({**op, "marks": mk, "slots": mk})
+    # ICON / CHẤM ĐẦU DÒNG TRƠ: chi tiết đi kèm một dòng (near "left of L5") mà dòng đó bị skip -> bỏ luôn chi tiết (09/10 dev3
+    # p08, p11: icon / chấm đầu dòng không có chữ)
+    dead = {m for op in ops if op.get("kind") == "skip" for m in op["marks"] if m.startswith("L")}
+    live = {m for op in ops if op.get("kind") in ("text", "keep") for m in op["marks"]}
+    for i, op in enumerate(ops):
+        if op.get("kind") in ("icon", "stars") and all(m.startswith("I") for m in op["marks"]):
+            near = [(by[m].get("near") or "").split() for m in op["marks"]]
+            tied = [n[-1] for n in near if len(n) >= 2 and n[0] in ("left", "on")]
+            if tied and all(t in dead and t not in live for t in tied):
+                log.append(f"{op.get('id')}: chi tiết đi kèm dòng bị bỏ {tied} -> skip")
+                ops[i] = {**op, "kind": "skip", "html": "", "why": "guard: orphan bullet / icon"}
     if texts:
         ops, lg = _guard(ops, M, texts)
         log += lg

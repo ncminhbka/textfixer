@@ -110,7 +110,8 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
     T["o"] = time.time() - t0
     t0 = time.time()
     progress("VLM thiết kế")
-    P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate), M, B["texts"])
+    P, log = slots.validate(slots.plan(draft, M, B["prompt_en"], B["texts"], vlm, product=product, base=plate), M, B["texts"],
+                             product=product)
     if cinfo["lines"]:
         log.insert(0, f"dọn chữ sót: inpaint {cinfo['inpaint']}, FLUX vùng cắt {cinfo['reerase']}")
     T["vlm"] = time.time() - t0
@@ -141,7 +142,7 @@ def design(d: dict, B: dict, vlm, page, product: bool = False, progress=_noop) -
         progress(f"VLM duyệt {k + 1}")
         try:
             P2, vlog2 = slots.validate(slots.review(draft, poster, M, P, errs, res, B["prompt_en"], B["texts"], vlm,
-                                                    product=product, changes=changes), M, B["texts"])
+                                                    product=product, changes=changes), M, B["texts"], product=product)
         except Exception as e:   # vòng duyệt hỏng (VLM trả sai, quá giờ): giữ bản đang có
             log.append(f"vòng duyệt {k + 1} hỏng: {type(e).__name__}: {str(e)[:200]}")
             break

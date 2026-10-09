@@ -169,6 +169,73 @@ tách "GIẢM" | "50%") thành ô có `runs`. **Tắt mặc định** (`TEXTFIX_
 | form đủ + prompt sơ sài | f01-f10 | 12 | "làm poster đẹp", "thiết kế giúp mình", không dấu, "banner", emoji; 6 loại form, ảnh sản phẩm, loại để sai |
 | ảnh thường | i01-i03 | 3 | không chữ -> chỉ FLUX; "poster cho tiệm hoa" không cho chữ -> không bịa chữ |
 
+## Kết quả dev3 (09/10, mã có đủ sửa dev2; `TEXTFIX_GEO` tắt)
+
+**Dữ liệu:** 61/62 ảnh (f03 lỗi "y1 must be >= y0" -- đã sửa c8bd4a9). Zip 01 tải lần đầu rỗng, lần hai bị VS Code mở như văn bản
+lưu lại (byte nhị phân thành U+FFFD) -- đừng mở zip trong trình soạn thảo.
+
+**Mốc:**
+
+| | dev3 (61 ảnh, 3 ảnh thường) | dev2 (62) |
+|---|---|---|
+| Lỗi lượt đầu | too_small 49 · boxes_overlap 21 · low_contrast 11 · overflow 2 · uneven_size 2 · mark_twice 1 | too_small 50 · low_contrast 12 · overflow 8 · uneven_size 8 · boxes_overlap 6 |
+| Sửa bằng code | 21 lần, giữ 18 | 20, giữ 14 |
+| Lỗi cuối | too_small 51 · boxes_overlap 4 · uneven_size 2 · overflow 1 | too_small 50 · overflow 7 · uneven_size 8 · boxes_overlap 1 |
+| too_small / ảnh | typography 0.7 · form 0.6 · **prompt dài 1.4** (câu khách TB 342 ký tự) | 0.8 |
+| Câu thiếu | 14 ảnh (VLM khai + mã đo; VLM bỏ không khai: 0 -- mã đã cộng vào) | 9 + 5 |
+| Thời gian | job trung vị 65 s, tối đa 137 s; ảnh thường 4-8 s | — |
+
+**Chấm các sửa của lượt dev2:**
+
+| Sửa | dev3 | Kết quả |
+|---|---|---|
+| B0 khung ảnh bằng lời | 4/4 ca 16:9 "horizontal / landscape"; dọc "vertical / portrait" | **đạt** |
+| B0 ảnh thường | i01, i02 ảnh thường; i03 "poster tiệm hoa" không cho chữ -> ảnh thường, không bịa chữ | **đạt** |
+| B0 [prompt LLM] form + prompt sơ sài là poster | f10 (form feedback + "tạo ảnh"): LLM vẫn trả `intent: image`, bỏ hết chữ | **không đạt** (prompt) |
+| B0 [code] thêm lại trường form | f10 cứu thành poster đủ 2 trường; f01 ngày gộp bị bỏ -> thêm lại; f04 | **đạt** |
+| B0 prompt thắng form | dev3 không có ca mâu thuẫn | chưa chấm |
+| B2 dọn 2 lượt + xác nhận OCR nháp | OCR bản dọn: 0 chữ đọc được còn sót (chỉ hàng sao p01); lượt 2 chạy 1 ảnh (p02) sạch | **đạt** phần chữ đọc được; còn sót chữ nghiêng / bóng (xem dưới) |
+| B2.5 cỡ chữ + khung không co | too_small / ảnh 0.8 -> 0.6-0.7 (ca thường) | **đạt một phần** |
+| B2.5 `SNAP_MIN_W` | gây lỗi f03 (khung lật khi giữ bề ngang OCR) | **không đạt** -> sửa c8bd4a9 (gt L F1 0.976 -> 0.980) |
+| B3 [code] skip "printed" -> keep | g15 v1: ruy băng chữ POSTER thành keep -> chữ nháp sai chính tả "QUẢ TỆNG" lên poster | **không đạt** -> chỉ khi có ảnh sản phẩm |
+| B3 [code] bỏ chữ không có trong câu khách / số nguyên | không bắt nhầm ca nào | đạt (không có ca để bắt) |
+| B3 [prompt VLM] không thẻ trong thẻ | p02 v1 viên thuốc vẽ đôi lệch | **không đạt** |
+| B3 [prompt VLM] giữ căn lề | p10 lề trái các mục so le | **không đạt** |
+| B4 dấu chồng / flex / emoji / đoạn văn | không tái phát | đạt |
+
+**Lỗi theo bước (xem 100% ảnh):**
+
+| Bước | Lỗi | Ảnh |
+|---|---|---|
+| B0 | LLM xếp form + "tạo ảnh" thành ảnh thường (code cứu) | 1 |
+| B1 | không chừa chỗ cho câu (f05 "Nhân viên bán hàng (5 người)") | 1 |
+| B2 | xoá sót chữ trên nhãn nghiêng (g06 v0 "MỚI") / huy hiệu (f09); vệt bóng tiêu đề (g04 v0); FLUX vẽ thêm hình chữ X mờ (g08 v1) | 4 |
+| B2.5 + hình học | **chữ cong**: OCR không đọc, cung thành 15 chi tiết I mỗi ô một chữ (g01 v0), vòng con dấu thành đoạn thẳng nhỏ (g02), cung cắt mảnh (g03, g12), chữ cung dưới huy hiệu mất (g12 v0) · **nhiều cỡ một dòng** mất điểm neo (g08 v0) · nhãn nghiêng bị dựng thẳng (g13 v0) | 9 |
+| B3 | chữ khách bị keep pixel nháp (g15 ×2) · tiêu đề chéo nhét vào ô khác, gần như mất (g07 v0) · bỏ chữ trong tiêu đề ("GIAO" g09 v1, "sau" p01 v1) + tự ngắt dòng mồ côi · chia một câu vào hai ô cạnh nhau -> đảo thứ tự đọc (p04, p07) · icon / chấm đầu dòng trơ (p08, p11) · bịa "WEAR CHIC" từ chữ nháp méo (f09) · đổi hoa thành thường (f06) · vẽ đôi viên thuốc (p02) · sao 3/5 khi prompt "5 sao" (p11) | ~14 |
+| B4 | tiêu đề chìm nền bị **đổi hẳn màu** xấu (g11 v1, g12 v1) · chữ vàng kim bị cắt mép (g14 v1) · chữ trên ruy băng chéo dựng rất nhỏ (g05 v0) | 4 |
+
+**Sửa lượt này (code, đo bằng dựng lại plan dev2 + dev3):**
+
+| Sửa | Bước | Kết quả |
+|---|---|---|
+| luật skip "printed" -> keep **chỉ khi khách tải ảnh sản phẩm** | B3 [code] | dev2 d25 vẫn đổi đúng; g15 hết đổi sai |
+| keep mà chữ OCR của ô trùng câu khách (giống >= 0.6, hoặc mẩu OCR khớp liền >= 80%) -> viết lại bằng câu khách | B3 [code] | đúng 1 ca (g15 v0) / 123 plan; ca nhầm p09 ("Noinlien Hic" trên thân nồi) bị chặn bằng điều kiện khớp liền |
+| icon / chấm đầu dòng đi kèm dòng bị skip -> skip | B3 [code] | đúng p08, 0 nhầm / 123 plan (p11: dòng không skip mà bị gộp -- theo dõi) |
+| tiêu đề chìm nền (>= 1.4 cỡ trung vị hoặc >= 6% cạnh ngắn): **giữ màu, thêm viền tương phản**; kiểm low_contrast tin lệnh đã có viền | B4 [code] | g11 v1 vàng + viền tối, g12 v1 trắng + viền tối: đọc rõ, giữ thiết kế |
+| chữ dải màu (`background-clip:text`) ở khung -> span ôm chữ | B4 [code] | g14 v1 "MÙA THU" đủ nét |
+| khối nhiều dòng tràn ngang -> thử bỏ `<br>` nếu vừa khung ở nguyên cỡ | B4 [code] | p01 / f02 không áp (VLM tự ngắt mồ côi, không tràn) -- giữ cho ca tràn |
+| chữ dải màu: span có đệm làm đo tràn oan (dev2 d02, d11 +3 too_small) -> bỏ đệm | B4 [code] | hết |
+| **hồi quy toàn tập** (dựng lại 120 plan dev2 + dev3, mã cũ vs mới, cùng máy) | — | dev3: too_small 48 = 48, boxes_overlap 8 = 8 · dev2: too_small 52 = 52, boxes_overlap 4 = 4 -- không tăng lỗi; khác số với server (51 / 4, 50 / 1) là do máy local vs server (Chromium / font), không do sửa |
+
+**Còn mở / cần quyết:**
+- **[cần quyết] VLM tự viết chữ không có trong câu khách**: nhãn chung "Khai Trương" (dev2 d16, trông ổn) và bịa "WEAR CHIC" từ chữ nháp
+  méo (dev3 f09, sai). Đề xuất: cấm hẳn -- ô không ứng câu khách nào thì skip (luật code chắc chắn hơn prompt).
+- **[cần quyết] rút gọn câu khách**: prompt VLM cho rút gọn câu dài cho vừa chỗ -> tiêu đề mất chữ ("sau", "GIAO"). Đề xuất: tiêu đề /
+  câu ngắn (<= 12 chữ) không được bỏ chữ; chỉ câu thân dài mới được rút gọn.
+- Chữ cong: bật `geo` cần B4 dựng theo đường chân + mô tả cho VLM (đang làm); dev3 có nháp thật để tune dò cung.
+- Dày chữ (prompt dài): too_small 1.4 / ảnh -- FLUX chừa chỗ ít hơn nhiều so với câu khách; cân nhắc dặn LLM viết prompt có khối chữ
+  thân đủ chỗ.
+
 ## Lượt chạy server tiếp theo
 
 Cập nhật mã (docs/SERVER.md), khởi động lại máy chủ **và kernel**, rồi:

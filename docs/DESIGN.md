@@ -118,13 +118,18 @@ không lặp (nháp vẽ một dòng hai lần) -> giữ lệnh có OCR giống 
 bớt (vòng sửa từng bỏ "triệu" cho vừa ô) -> trả nguyên câu. Lệnh viết câu khách mà chen chữ không có trong câu khách nào (chép chữ
 méo của nháp: "CUỐI TỬA TUẦN", 09/10) -> bỏ chữ đó. Lệnh `skip` mà lý do ghi chữ in trên sản phẩm ("printed logo on product") ->
 `keep` (bản xoá đã xoá nó, skip là mất con dấu / nhãn). Câu khách không có trên poster được **đo bằng mã** (chữ của mọi lệnh) và
-cộng vào `missing` -- VLM hay bỏ câu mà không khai (dev2: 5 ca).
+cộng vào `missing` -- VLM hay bỏ câu mà không khai (dev2: 5 ca). Luật skip -> keep chỉ áp khi khách tải ảnh sản phẩm (không có
+ảnh sản phẩm thì "chữ in trên ruy băng" là chữ poster, dev3 g15); lệnh keep mà chữ OCR của ô trùng một câu khách -> viết lại bằng
+câu khách (keep là dán chữ nháp sai chính tả lên poster); icon / chấm đầu dòng đi kèm một dòng bị skip -> skip.
 
 Dựng (09/10, dev2): emoji bỏ (không có font emoji -> ô vuông); nhiều dòng mà dòng sau có chữ hoa mang dấu trên -> line-height
 >= 1.15 (dấu sắc của "THÁNG" đâm vào chân chữ O dòng trên thành "DRQP"); cột flex trong thẻ font (`<i-font><span flex>tên</span>
 <span flex>giá</span></i-font>`) -> thẻ bọc `display:contents` (trước: "Bún bò tái40.000đ"), khối có flex không nén ngang; đoạn
 văn (>= 3 dòng nháp, >= 10 chữ) bỏ `<br>` chép theo dòng nháp, tự ngắt (`text-wrap:pretty`) -- giữ `<br>` thì dòng dài gãy thêm,
 chữ mồ côi mỗi dòng; tương phản đo cả **từng đoạn chữ** của khối nhiều màu ("Giảm" trắng + "40%" cam trên nền đỏ).
+Chữ cỡ tiêu đề (>= 1.4 cỡ trung vị hoặc >= 6% cạnh ngắn) chìm nền: **giữ màu, thêm viền tương phản** thay vì đổi màu (đổi màu làm
+mất thiết kế: cam viền trắng thành nâu ô liu, dev3); chữ tô dải màu (`background-clip:text`) ghi ở khung -> chuyển vào span ôm chữ
+(dải màu chỉ phủ trong khung, nét tràn khung trong suốt); khối nhiều dòng tràn ngang -> thử bỏ `<br>`, giữ nếu vừa ở nguyên cỡ.
 
 Độ rộng chữ: mỗi dòng ghi độ rộng nét chữ đo trên nháp (em / ký tự), danh mục font ghi độ rộng từng font (`fonts.WIDTH`, đo bằng
 `scripts/font_widths.py`) -- chọn font rộng hơn chữ nháp là nguyên nhân chính của too_small (08/10). Chữ tô gradient: text-shadow đổi

@@ -294,8 +294,18 @@ async (o) => {
     }
     let s = e.size, k = 0, m = over(), sx = 1;
     const m0q = m.q, m0b = d.getBoundingClientRect(), fs0 = parseFloat(d.style.fontSize) || 0;   // tràn lúc CHƯA co: ngang / dọc
-    const o0 = [Math.max(0, m0b.left - m0q.left, m0q.right - m0b.right),
-                Math.max(0, m0b.top - m0q.top - pad.top * fs0, m0q.bottom - m0b.bottom - pad.bot * fs0)];
+    let o0 = [Math.max(0, m0b.left - m0q.left, m0q.right - m0b.right),
+              Math.max(0, m0b.top - m0q.top - pad.top * fs0, m0q.bottom - m0b.bottom - pad.bot * fs0)];
+    // NGẮT LẠI: khối nhiều dòng (<br> chép theo dòng nháp) tràn ngang -> dòng dài tự gãy thêm, chữ mồ côi ("Khách hàng nói / gì",
+    // "Tóc mềm mượt / sau": 09/10 dev3 p01, f02) -> thử bỏ <br>, trình duyệt tự ngắt; GIỮ nếu vừa khung ở nguyên cỡ
+    if (o0[0] > 1 && /<br/i.test(d.innerHTML) && !d.querySelector('div,p,ul,ol,li,table,section,[style*="flex"]')) {
+      const keep = d.innerHTML, ws = d.style.whiteSpace;
+      d.innerHTML = keep.replace(/\s*<br\s*\/?>\s*/gi, ' ');
+      d.style.whiteSpace = 'normal'; d.style.textWrap = 'pretty';
+      const m2 = over();
+      if (m2.v <= 1) { m = m2; o0 = [0, 0]; }
+      else { d.innerHTML = keep; d.style.whiteSpace = ws; d.style.textWrap = ''; }
+    }
     // NÉN NGANG trước khi co: chữ dài hơn ô (tràn ngang) -> scaleX tới o.condense, giữ cỡ chữ (chiều cao) như nháp -- co cỡ
     // làm chữ bé hẳn so với nháp (08/10 server: too_small 33 / 27 ảnh). Chỉ khối chữ dòng (không div / p / li bên trong: bọc
     // lại sẽ đổi bố cục flex của VLM); tâm nén theo căn lề của khung.
@@ -425,6 +435,15 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             h = re.sub(r"\s*<\s*br\b[^>]*>\s*", " ", h, flags=re.I)
             bs = "text-wrap:pretty;" + bs
             log.append(f"{op['id']}: đoạn văn -- bỏ <br> theo dòng nháp, tự ngắt dòng")
+        # CHỮ TÔ DẢI MÀU (background-clip:text) ghi ở khung: dải màu chỉ phủ trong KHUNG, nét chữ tràn ra ngoài khung trong suốt
+        # (09/10 dev3 g14: "MÙA THU" vàng kim mất chữ M) -> chuyển dải màu vào span ôm chính chữ
+        if re.search(r"background-clip\s*:\s*text", bs, flags=re.I):
+            grad = re.findall(r"(?:^|;)\s*((?:-webkit-)?background(?:-image|-clip)?\s*:[^;]+|-webkit-text-fill-color\s*:[^;]+)", bs, flags=re.I)
+            if grad:
+                for g_ in grad:
+                    bs = bs.replace(g_, "")
+                h = (f'<span style="display:inline-block;{";".join(grad)}">{h}</span>')
+                log.append(f"{op['id']}: chữ dải màu -> dải màu ôm chữ (không cắt nét tràn khung)")
         if re.search(r"text-align\s*:\s*(left|start)", bs) and "justify-content" not in bs:   # căn trái mà khối vẫn ở giữa ô
             bs += ";justify-content:flex-start"
         elif re.search(r"text-align\s*:\s*(right|end)", bs) and "justify-content" not in bs:
@@ -440,6 +459,12 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
             force.append(f"#c>.{cls},#c>.{cls} *{{color:{fix['color']}!important;-webkit-text-fill-color:{fix['color']}!important;"
                          + (f"text-shadow:0 0 .08em {fix['halo']},0 0 .16em {fix['halo']},0 0 .3em {fix['halo']}!important;"
                             if fix.get("halo") else "") + "}")
+        elif fix.get("outline"):   # chữ cỡ TIÊU ĐỀ chìm nền: GIỮ màu chữ (thiết kế), thêm viền + quầng màu tương phản
+            cls = f"fx{len(els)}"
+            c = fix["outline"]
+            ring = ",".join(f"{dx:.3f}em {dy:.3f}em 0 {c}" for dx, dy in
+                            ((.04, 0), (-.04, 0), (0, .04), (0, -.04), (.028, .028), (-.028, .028), (.028, -.028), (-.028, -.028)))
+            force.append(f"#c>.{cls},#c>.{cls} *{{text-shadow:{ring},0 0 .18em {c}!important;}}")
         els.append({"id": op["id"], "box": b, "html": h, "style": bs, "size": size, "color": color, "font": family(fam),
                     "fit": fix.get("fit") or op.get("fit") or "shrink", "angle": g["angle"], "cls": cls,
                     "condense": fix.get("condense"), "icon": op.get("kind") == "icon" and bool(mk)
@@ -495,12 +520,15 @@ def render(page, plate: np.ndarray, P: dict, M: dict, floor: float | None = None
                     r["low"], r["px_based"] = u["low"], u.get("px_based", False)
                     break
     pal = list(dict.fromkeys(r["fg"] for r in res if r.get("fg") and not bad(r)))   # màu chữ đọc tốt trên poster
+    fs_med = float(np.median([r["fs"] for r in res if r.get("fs")] or [0]))   # cỡ chữ trung vị của poster (tiêu đề = to hơn hẳn)
     for r in res:
         if bad(r):
-            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal)
+            r["recolor"] = _recolor(r, bg, color0.get(r["id"]), pal, big=bool(r.get("fs") and (r["fs"] >= OUTLINE_HEAD * fs_med or r["fs"] >= OUTLINE_ABS * min(W, H))))
     return img, res, log
 
 
+OUTLINE_HEAD = 1.4   # chữ cỡ >= 1.4 lần cỡ trung vị poster (tiêu đề) chìm nền: giữ màu + viền thay vì đổi màu ...
+OUTLINE_ABS = 0.06   # ... hoặc cỡ >= 6% cạnh ngắn ảnh (poster nhiều chữ to: trung vị cao -- dev3 g12 114 / 95 px)
 CONTRAST_PX = 2.0   # điểm nền mà màu chữ trên đó có tỉ lệ tương phản WCAG < 2 = chữ chìm (chữ thân cần >= 4.5, chữ lớn >= 3)
 CONTRAST_FRAC = 0.25   # > 25% nền sau khối chữ là điểm chìm = lỗi low_contrast (khối chữ không có bóng / viền)
 
@@ -550,7 +578,7 @@ def _rgb(c: str | None) -> tuple | None:
     return tuple(float(m.group(i)) for i in (1, 2, 3)) if m else None
 
 
-def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None) -> dict | None:
+def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None = None, big: bool = False) -> dict | None:
     """Chữ chìm nền: màu chữ thay thế, ưu tiên HỢP BẢNG MÀU (08/10 replay: tiêu đề vàng nhạt -> gần đen, đọc được nhưng thô) --
     màu các chữ đọc tốt khác trên poster, rồi màu nháp tối / sáng dần, cuối cùng trắng / gần đen: màu ĐẦU TIÊN có <= 10% nền
     chìm (tương phản WCAG < CONTRAST_PX). Không màu nào đạt: màu ít chìm nhất + quầng màu ngược độ sáng."""
@@ -560,6 +588,11 @@ def _recolor(r: dict, bg: np.ndarray, draft_color: str | None, pal: list | None 
     if x1 - x0 < 2 or y1 - y0 < 2:
         return None
     lb = _lum(bg[y0:y1, x0:x1].reshape(-1, 3))
+    if big and _rgb(r.get("fg")):
+        # TIÊU ĐỀ: đổi hẳn màu làm mất thiết kế (09/10 dev3 g11: cam viền trắng -> nâu ô liu, g12: trắng -> xám) -> giữ màu chữ,
+        # viền màu ngược độ sáng của chữ (chữ sáng viền tối, chữ tối viền trắng) -- như nháp hay vẽ chữ có viền
+        lf = float(_lum(np.array([_rgb(r["fg"])], np.float32))[0])
+        return {"outline": "#161616" if lf > 0.35 else "#ffffff", "frac": None}
     cands = list(pal or [])   # màu chữ khác của chính poster trước: hợp bảng màu (màu nháp pha đen ra xám đục -- 08/10 h08_s1)
     d = _rgb(draft_color) or _rgb(r.get("fg"))
     if d:
@@ -687,6 +720,7 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
     dựng) nội dung hai lệnh chồng nhau, nội dung tràn khung dù đã co tới sàn, phải co dưới shrink_min (nhồi quá nhiều chữ).
     Lệnh nằm trong khung một vỏ (shape / group) không tính là chồng; vỏ rỗng (chỉ CSS) không đo tràn / chồng nội dung."""
     draw = [op for op in P["ops"] if op.get("kind") in DRAW and (op.get("html") or op.get("box_style"))]
+    by_id = {op["id"]: op for op in P["ops"]}
     errs, seen = [], {}
     if M.get("S") is not None:   # mọi ô phải thuộc một lệnh -- ô bỏ sót = chữ / chi tiết biến mất không ai quyết
         used = {m for op in P["ops"] for m in op.get("marks") or []}
@@ -725,7 +759,8 @@ def check(P: dict, M: dict, res: list | None = None, shrink_min: float | None = 
             errs.append({"type": "overflow", "ops": [a["id"]], "px": round(a["over"])})
         elif shrink_min and a.get("shrink", 1) < shrink_min and not a.get("evened"):   # nhồi quá nhiều chữ so với chỗ model vẽ: chữ bé đi -> xấu
             errs.append({"type": "too_small", "ops": [a["id"]], "shrink": round(a["shrink"], 2)})
-        if (a.get("low") or 0) > (0.6 if a.get("px_based") else CONTRAST_FRAC):   # chữ chìm vào nền thật sau nó
+        # chữ chìm vào nền thật sau nó (lệnh đã được code thêm viền tương phản: viền tách chữ khỏi nền dù ruột chữ gần màu nền)
+        if (a.get("low") or 0) > (0.6 if a.get("px_based") else CONTRAST_FRAC) and                 not ((by_id.get(a["id"]) or {}).get("fix") or {}).get("outline"):
             errs.append({"type": "low_contrast", "ops": [a["id"]], "frac": a["low"], "color": a.get("fg")})
     errs += _uneven(P, M, res or [])
     return errs
@@ -773,8 +808,12 @@ def autofix(P: dict, M: dict, errs: list[dict], res: list[dict]) -> tuple[dict, 
             log.append(f"ô bỏ sót {e['slots']} -> skip")
         elif t == "low_contrast" and ids and (R.get(ids[0]) or {}).get("recolor"):
             rc = R[ids[0]]["recolor"]
-            fx(ids[0]).update(color=rc["color"], halo=rc["halo"])
-            log.append(f"{ids[0]}: chìm nền {e['frac']} -> màu {rc['color']}" + (" + quầng" if rc["halo"] else ""))
+            if rc.get("outline"):
+                fx(ids[0]).update(outline=rc["outline"])
+                log.append(f"{ids[0]}: chìm nền {e['frac']} -> giữ màu, viền {rc['outline']}")
+            else:
+                fx(ids[0]).update(color=rc["color"], halo=rc["halo"])
+                log.append(f"{ids[0]}: chìm nền {e['frac']} -> màu {rc['color']}" + (" + quầng" if rc["halo"] else ""))
         elif t == "overflow" and ids:
             fx(ids[0])["condense"] = 0.75
             log.append(f"{ids[0]}: tràn {e['px']}px -> nén ngang tới 0.75")
