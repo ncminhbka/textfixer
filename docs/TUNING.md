@@ -1,5 +1,31 @@
 # Theo dõi tune từng bước
 
+## Quy tắc tune khi nhận một tập dev mới
+
+1. **Nhận đủ dữ liệu.** Giải nén vào `output/<tập>/`; đếm `plan.json` so với manifest. Zip cụt / thiếu -> cứu phần còn
+   nguyên, báo ngay ca nào thiếu, xin tải lại; không kết luận trên tập thiếu mà không ghi rõ.
+2. **Ghi mốc trước khi sửa gì.** `scripts/runs_report.py --runs output/<tập> --all --again --no-ship`: lỗi lượt đầu / cuối
+   theo loại, sửa bằng code chạy / giữ, câu thiếu (VLM khai + đo bằng mã), thời gian -> mục "Mốc" của tập.
+3. **Chấm lượt tune trước.** Tập mới là phép thử của các sửa "chờ server" / "thử": từng dòng đó đổi thành **đạt** /
+   **không đạt** kèm số. Sửa không đạt thì xem lại trước khi thêm sửa mới.
+4. **Xem bằng mắt 100% ảnh** (nháp | bản xoá | poster, kèm plan khi cần). Ghi mỗi lỗi vào **bước gây ra nó**, không phải bước
+   nó lộ ra (chữ co nhỏ ở B4 có thể do B2.5 đo sai cỡ; chữ rác ở poster có thể do B2 xoá sót) -- truy tới số đo / lệnh cụ thể.
+   Bảng "Lỗi theo bước" ghi số ảnh dính.
+5. **Xếp ưu tiên** theo số ảnh dính × độ nặng: sai / mất / bịa chữ khách > chữ rác, chữ chồng > vỡ bố cục (vỏ mất, khung sai) >
+   thẩm mỹ (cỡ, căn, hiệu ứng). Lỗi là **chính sách** (prompt hay form thắng, có cho tự viết nhãn không, chấp nhận hạn chế
+   model) -> hỏi người dùng, không tự quyết.
+6. **Sửa tổng quát, có số đo.** Ưu tiên **[code]** đo được hơn **[prompt]**; prompt chỉ cho điều code không biết. Không viết
+   luật theo một ca. Mỗi sửa có số trước -> sau: replay plan cũ / dựng lại / bộ đáp án ô / bộ tổng hợp; không đo được local
+   (LLM, VLM, FLUX) thì ghi **chờ server**.
+7. **Chống khớp quá sát.** Mỗi sửa chạy trên **toàn tập** (không chỉ ca lỗi) + `bench/slots_gt` (`slots_gt.py eval --vs base`)
+   + `geo_synth` khi đụng ô / hình học: không bắt nhầm, không tụt số. Ngưỡng chọn ở **khoảng tách** giữa ca đúng và ca sai trên
+   phân bố, không vừa khít một ca. Lỗi một ảnh không lặp lại và không nặng -> ghi "theo dõi", chưa sửa.
+8. **Tính năng dở dang để sau cờ tắt** (vd. `TEXTFIX_GEO`) cho tới khi cả đường đi (đo -> VLM -> dựng) xong và đo được.
+9. **Ghi lại.** Mỗi sửa một dòng ở nhật ký đúng bước, gắn [code] / [prompt LLM] / [prompt VLM] + trạng thái; cập nhật bảng
+   "Đã siết prompt"; docs/DESIGN.md cho cơ chế mới. Commit theo cụm (kiểm không có tên dịch vụ nội bộ / bí mật).
+10. **Báo người dùng:** lỗi theo bước, đã sửa gì (số đo), cái gì chờ server, cái gì cần quyết.
+11. **Soạn tập dev kế tiếp:** thêm ca cho lỗi mới thấy và nhóm chưa phủ, seed cố định; giữ tập cũ để chạy lại so trước / sau.
+
 Mỗi lượt tune ghi một dòng: ngày, tập, lỗi thấy, thay đổi, số đo trước -> sau, trạng thái.
 Trạng thái: **đo** (có số đo trên cả tập) · **thử** (chỉ thử vài ca / dựng lại / LLM giả) · **chờ server** (cần LLM / VLM / FLUX
 thật để biết) · **đề xuất** (chưa làm) · **chấp nhận** (quyết không sửa).
