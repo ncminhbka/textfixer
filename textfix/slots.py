@@ -262,6 +262,12 @@ def _unstack(L: list[dict]) -> None:
                     x0 = max(x0, (bx1 + ox0) / 2)
                 else:
                     x1 = min(x1, (bx0 + ox1) / 2)
+        # bị cắt từ hai phía tới mức lật / còn quá mỏng (khung giữ bề ngang OCR chạm cả dòng trên lẫn dưới: 09/10 dev3 f03
+        # "y1 must be >= y0") -> chiều đó về khung OCR
+        if y1 - y0 < 0.5 * (oy1 - oy0):
+            y0, y1 = oy0, oy1
+        if x1 - x0 < 0.5 * (ox1 - ox0):
+            x0, x1 = ox0, ox1
         new.append([float(x0), float(y0), float(x1), float(y1)])
     for a, b in zip(L, new):
         a["box"] = b
@@ -366,6 +372,7 @@ def marked_image(img: np.ndarray, M: dict):
             [(m, (255, 150, 0), 2, "br") for m in M["I"]]
     for m, col, wd, corner in items:
         x0, y0, x1, y1 = m["box"]
+        x0, x1, y0, y1 = min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1)   # ảnh debug không được làm hỏng phiên bản
         d.rectangle([x0, y0, x1, y1], outline=col, width=wd)
         tw, th = d.textbbox((0, 0), m["id"], font=f)[2:]
         tx, ty = (x0, max(0, y0 - th - 2)) if corner == "tl" else (max(0, x1 - tw - 2), min(img.shape[0] - th - 2, y1 + 1))
@@ -932,6 +939,7 @@ def _ids_image(proof: np.ndarray, M: dict, P: dict):
         if not b:
             continue
         col = KIND_COL.get(op.get("kind"), (230, 30, 30))
+        b = [min(b[0], b[2]), min(b[1], b[3]), max(b[0], b[2]), max(b[1], b[3])]
         d.rectangle(b, outline=col, width=2)
         tw, th = d.textbbox((0, 0), op["id"], font=f)[2:]
         d.rectangle([b[0], max(0, b[1] - th - 2), b[0] + tw + 2, max(0, b[1] - th - 2) + th + 2], fill=col)

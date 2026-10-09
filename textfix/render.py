@@ -904,6 +904,7 @@ def ops_image(img, M, P):
         if not b:
             continue
         col = KIND_COL.get(op.get("kind"), (0, 0, 0))
+        b = [min(b[0], b[2]), min(b[1], b[3]), max(b[0], b[2]), max(b[1], b[3])]
         d.rectangle(b, outline=col, width=3)
         lab = f"{op.get('kind')}: {plain(op.get('html', ''))[:40]}"
         d.text((b[0] + 3, b[1] + 2), lab, fill=col, font=f)
